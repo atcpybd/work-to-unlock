@@ -92,6 +92,30 @@ public sealed class SqlitePersistenceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_paused_break_round_trips_without_adding_reward_history()
+    {
+        var store = new SqliteRewardStateStore(_database);
+        var now = new DateTimeOffset(2026, 3, 1, 12, 0, 0, TimeSpan.Zero);
+        var unlocked = await store.SaveAsync(new RewardStateRecord
+        {
+            State = RewardState.Unlocked,
+            AccumulatedWorkMilliseconds = 3_600_000,
+            RewardActivatedUtc = now,
+            RewardExpiresUtc = now.AddMinutes(20),
+            RewardDurationMilliseconds = 1_200_000,
+        }, 0, new RewardTransition(RewardTransitionKind.Activated, now, "activated"), CancellationToken.None);
+
+        var paused = await store.SaveAsync(unlocked with { PausedRemainingMilliseconds = 900_000, PausedUtc = now.AddMinutes(5) }, unlocked.Version,
+            new RewardTransition(RewardTransitionKind.Paused, now.AddMinutes(5), "paused"), CancellationToken.None);
+
+        Assert.Equal(paused, await store.LoadAsync(CancellationToken.None));
+        var report = await new SqliteStatisticsStore(_database).GetReportAsync(now, TimeZoneInfo.Utc, 7, CancellationToken.None);
+        Assert.Equal(1, report.RewardsActivated);
+        var audit = await new SqliteAuditLog(_database).GetRecentAsync(10, CancellationToken.None);
+        Assert.Equal("RewardPaused", audit[0].EventType);
+    }
+
+    [Fact]
     public async Task Stale_versions_are_rejected()
     {
         var store = new SqliteRewardStateStore(_database);

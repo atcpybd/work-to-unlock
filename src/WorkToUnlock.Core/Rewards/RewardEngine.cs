@@ -31,6 +31,12 @@ public interface IRewardEngine
 
     Task ResetProgressAsync(string reason, CancellationToken cancellationToken);
 
+    /// <summary>Stops the countdown of a running break, keeping the time left. Returns true when it paused.</summary>
+    Task<bool> PauseAsync(string reason, CancellationToken cancellationToken);
+
+    /// <summary>Restarts a paused break with exactly the time that was left. Returns true when it resumed.</summary>
+    Task<bool> ResumeAsync(CancellationToken cancellationToken);
+
     Task UpdateSettingsAsync(RewardSettings settings, CancellationToken cancellationToken);
 
     /// <summary>Persists accumulated work that has not been saved yet.</summary>
@@ -208,6 +214,82 @@ public sealed class RewardEngine(IRewardStateStore store, IClock clock, ILogger<
         }
     }
 
+    public async Task<bool> PauseAsync(string reason, CancellationToken cancellationToken)
+    {
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            EnsureInitialized();
+            var state = _state;
+            if (state.Record.State != RewardState.Unlocked || state.Record.PausedRemainingMilliseconds is not null)
+            {
+                return false;
+            }
+
+            var remaining = Remaining(state);
+            if (remaining <= TimeSpan.Zero)
+            {
+                await ExpireAsync("Reward time elapsed", cancellationToken).ConfigureAwait(false);
+                return false;
+            }
+
+            var now = clock.UtcNow;
+            var saved = await store.SaveAsync(
+                state.Record with { PausedRemainingMilliseconds = (long)remaining.TotalMilliseconds, PausedUtc = now },
+                state.Record.Version,
+                new RewardTransition(RewardTransitionKind.Paused, now, $"Break paused with {FormatDuration(remaining)} left ({reason})"),
+                cancellationToken).ConfigureAwait(false);
+
+            _state = state with { Record = saved, DeadlineMonotonic = null };
+            logger.LogInformation("Break paused with {Remaining} left ({Reason})", remaining, reason);
+            Publish();
+            return true;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    public async Task<bool> ResumeAsync(CancellationToken cancellationToken)
+    {
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            EnsureInitialized();
+            var state = _state;
+            if (state.Record.State != RewardState.Unlocked || state.Record.PausedRemainingMilliseconds is not long left)
+            {
+                return false;
+            }
+
+            var now = clock.UtcNow;
+            var mono = clock.MonotonicMilliseconds;
+            var record = state.Record with
+            {
+                RewardExpiresUtc = now.AddMilliseconds(left),
+                DeadlineMonotonicMilliseconds = mono + left,
+                BootId = clock.BootId,
+                PausedRemainingMilliseconds = null,
+                PausedUtc = null,
+            };
+            var saved = await store.SaveAsync(
+                record,
+                state.Record.Version,
+                new RewardTransition(RewardTransitionKind.Resumed, now, $"Break resumed with {FormatDuration(TimeSpan.FromMilliseconds(left))} left"),
+                cancellationToken).ConfigureAwait(false);
+
+            _state = state with { Record = saved, DeadlineMonotonic = mono + left };
+            logger.LogInformation("Break resumed until {Expires:u}", saved.RewardExpiresUtc);
+            Publish();
+            return true;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
     public async Task UpdateSettingsAsync(RewardSettings settings, CancellationToken cancellationToken)
     {
         ValidateSettings(settings);
@@ -326,6 +408,8 @@ public sealed class RewardEngine(IRewardStateStore store, IClock clock, ILogger<
         RewardDurationMilliseconds = null,
         DeadlineMonotonicMilliseconds = null,
         BootId = null,
+        PausedRemainingMilliseconds = null,
+        PausedUtc = null,
     };
 
     /// <summary>Repairs impossible persisted values conservatively (towards restrictions being on).</summary>
@@ -354,6 +438,15 @@ public sealed class RewardEngine(IRewardStateStore store, IClock clock, ILogger<
             record = record with { AccumulatedWorkMilliseconds = Math.Max(record.AccumulatedWorkMilliseconds, (long)settings.WorkRequirement.TotalMilliseconds) };
         }
 
+        if (record.State != RewardState.Unlocked && (record.PausedRemainingMilliseconds is not null || record.PausedUtc is not null))
+        {
+            record = record with { PausedRemainingMilliseconds = null, PausedUtc = null };
+        }
+        else if (record.PausedRemainingMilliseconds is < 0)
+        {
+            record = record with { PausedRemainingMilliseconds = 0 };
+        }
+
         return record;
     }
 
@@ -364,9 +457,9 @@ public sealed class RewardEngine(IRewardStateStore store, IClock clock, ILogger<
     /// </summary>
     private long? RestoreDeadline(RewardStateRecord record)
     {
-        if (record.State != RewardState.Unlocked)
+        if (record.State != RewardState.Unlocked || record.PausedRemainingMilliseconds is not null)
         {
-            return null;
+            return null; // a paused break gets a new deadline when it resumes
         }
 
         var mono = clock.MonotonicMilliseconds;
@@ -400,8 +493,10 @@ public sealed class RewardEngine(IRewardStateStore store, IClock clock, ILogger<
             return TimeSpan.Zero;
         }
 
-        var remaining = record.RewardExpiresUtc.Value - clock.UtcNow;
-        if (state.DeadlineMonotonic is long deadline)
+        var remaining = record.PausedRemainingMilliseconds is long paused
+            ? TimeSpan.FromMilliseconds(paused)
+            : record.RewardExpiresUtc.Value - clock.UtcNow;
+        if (record.PausedRemainingMilliseconds is null && state.DeadlineMonotonic is long deadline)
         {
             var monoRemaining = TimeSpan.FromMilliseconds(deadline - clock.MonotonicMilliseconds);
             if (monoRemaining < remaining)
@@ -437,6 +532,7 @@ public sealed class RewardEngine(IRewardStateStore store, IClock clock, ILogger<
             RewardActivatedUtc = record.RewardActivatedUtc,
             RewardExpiresUtc = record.RewardExpiresUtc,
             RemainingReward = Remaining(state),
+            IsPaused = record.State == RewardState.Unlocked && record.PausedRemainingMilliseconds is not null,
         };
     }
 

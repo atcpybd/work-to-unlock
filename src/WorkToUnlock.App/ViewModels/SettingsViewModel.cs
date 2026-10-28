@@ -84,6 +84,9 @@ public sealed partial class SettingsViewModel : ObservableObject
     public partial bool NotificationsEnabled { get; set; } = true;
 
     [ObservableProperty]
+    public partial bool PauseBreakWhileLocked { get; set; }
+
+    [ObservableProperty]
     public partial bool EnforcementEnabled { get; set; } = true;
 
     [ObservableProperty]
@@ -140,6 +143,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             StartWithWindows = StartWithWindows,
             MinimizeToTray = MinimizeToTray,
             NotificationsEnabled = NotificationsEnabled,
+            PauseBreakWhileLocked = PauseBreakWhileLocked,
         };
 
         // Validate locally first for instant feedback; the agent validates again.
@@ -318,6 +322,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         StartWithWindows = settings.StartWithWindows;
         MinimizeToTray = settings.MinimizeToTray;
         NotificationsEnabled = settings.NotificationsEnabled;
+        PauseBreakWhileLocked = settings.PauseBreakWhileLocked;
         EnforcementEnabled = settings.EnforcementEnabled;
         HasChanges = false;
         _loading = false;
@@ -341,7 +346,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         base.OnPropertyChanged(e);
         if (!_loading && e.PropertyName is nameof(WorkRequirementMinutes) or nameof(RewardDurationMinutes) or nameof(IdleThresholdSeconds)
                 or nameof(GracefulCloseTimeoutSeconds) or nameof(DataRetentionDays) or nameof(DailyGoalMinutes) or nameof(EnforcementModeIndex) or nameof(ThemeIndex)
-                or nameof(StartWithWindows) or nameof(MinimizeToTray) or nameof(NotificationsEnabled))
+                or nameof(StartWithWindows) or nameof(MinimizeToTray) or nameof(NotificationsEnabled) or nameof(PauseBreakWhileLocked))
         {
             HasChanges = true;
         }

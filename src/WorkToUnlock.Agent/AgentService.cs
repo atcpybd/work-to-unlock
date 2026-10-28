@@ -149,6 +149,7 @@ public sealed class AgentService(IServiceProvider services, ILogger<AgentService
         await coordinator.StartAsync(cancellationToken).ConfigureAwait(false);
         services.GetRequiredService<NotificationService>().Start();
         services.GetRequiredService<AchievementService>().Start();
+        services.GetRequiredService<BreakPauseService>().Start();
 
         // 4. Startup registration and IPC.
         platform.ApplyStartupRegistration(settings.Current.StartWithWindows);

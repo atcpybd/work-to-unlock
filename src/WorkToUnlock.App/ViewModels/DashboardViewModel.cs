@@ -405,9 +405,13 @@ public sealed partial class DashboardViewModel : ObservableObject
                 WorkedText = Format.Countdown(reward.RemainingReward);
                 RequiredText = "remaining";
                 CountdownText = Format.Countdown(reward.RemainingReward);
-                ExpiresText = $"Restricted apps lock again at {Format.LocalTime(reward.RewardExpiresUtc)}";
-                Headline = "Apps unlocked";
-                Subtitle = "Enjoy your break. The countdown keeps running even if you step away or the PC sleeps.";
+                ExpiresText = reward.IsPaused
+                    ? "Paused while you're away"
+                    : $"Restricted apps lock again at {Format.LocalTime(reward.RewardExpiresUtc)}";
+                Headline = reward.IsPaused ? "Break paused" : "Apps unlocked";
+                Subtitle = reward.IsPaused
+                    ? "Your break continues with the same time left when you're back."
+                    : "Enjoy your break. Restricted apps lock again when the countdown ends.";
                 break;
             default:
                 WorkedText = Format.Countdown(reward.AccumulatedWork);

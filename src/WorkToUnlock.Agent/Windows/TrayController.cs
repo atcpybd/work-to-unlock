@@ -100,6 +100,7 @@ internal sealed partial class TrayController(
         return reward.State switch
         {
             RewardState.RewardReady => $"Reward ready ({NotificationService.Format(reward.RewardDuration)})",
+            RewardState.Unlocked when reward.IsPaused => $"Break paused, {NotificationService.Format(reward.RemainingReward)} left",
             RewardState.Unlocked => $"Unlocked, {NotificationService.Format(reward.RemainingReward)} left",
             _ => $"{(int)reward.AccumulatedWork.TotalMinutes} of {(int)reward.RequiredWork.TotalMinutes} min worked",
         };

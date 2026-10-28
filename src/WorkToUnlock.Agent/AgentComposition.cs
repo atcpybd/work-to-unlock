@@ -79,6 +79,7 @@ internal static class AgentComposition
         services.AddSingleton<ProgressService>();
         services.AddSingleton<ProtectionMonitor>();
         services.AddSingleton<AchievementService>();
+        services.AddSingleton<BreakPauseService>();
 
         // Tray and OS integration
         services.AddSingleton<AgentWindow>();

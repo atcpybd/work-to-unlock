@@ -69,6 +69,14 @@
                             </StackPanel>
                             <NumberBox Grid.Column="1" Style="{StaticResource SettingNumberStyle}" Minimum="0" Maximum="1440" SmallChange="15" LargeChange="60" Value="{x:Bind ViewModel.DailyGoalMinutes, Mode=TwoWay}" AutomationProperties.Name="Daily goal in minutes" />
                         </Grid>
+                        <Grid Style="{StaticResource SettingRowStyle}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="Pause breaks while away" />
+                                <TextBlock Style="{StaticResource SecondaryTextStyle}" Text="A running break stops counting down while the PC is locked or asleep, and continues with the same time left when you're back." />
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1" MinWidth="0" IsOn="{x:Bind ViewModel.PauseBreakWhileLocked, Mode=TwoWay}" AutomationProperties.Name="Pause breaks while away" />
+                        </Grid>
                     </StackPanel>
                 </Border>
 
