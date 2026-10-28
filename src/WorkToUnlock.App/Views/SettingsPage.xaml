@@ -61,6 +61,14 @@
                             </StackPanel>
                             <NumberBox Grid.Column="1" Style="{StaticResource SettingNumberStyle}" Minimum="10" Maximum="3600" LargeChange="30" Value="{x:Bind ViewModel.IdleThresholdSeconds, Mode=TwoWay}" AutomationProperties.Name="Idle threshold in seconds" />
                         </Grid>
+                        <Grid Style="{StaticResource SettingRowStyle}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="Daily goal" />
+                                <TextBlock Style="{StaticResource SecondaryTextStyle}" Text="Minutes of work per day for your streak. Reach it on consecutive days to build a streak (0 turns it off)." />
+                            </StackPanel>
+                            <NumberBox Grid.Column="1" Style="{StaticResource SettingNumberStyle}" Minimum="0" Maximum="1440" SmallChange="15" LargeChange="60" Value="{x:Bind ViewModel.DailyGoalMinutes, Mode=TwoWay}" AutomationProperties.Name="Daily goal in minutes" />
+                        </Grid>
                     </StackPanel>
                 </Border>
 

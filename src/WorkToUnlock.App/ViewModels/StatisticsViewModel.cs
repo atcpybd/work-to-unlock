@@ -3,6 +3,7 @@ using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using WorkToUnlock.App.Services;
+using WorkToUnlock.Core.Domain;
 using WorkToUnlock.Core.Ipc;
 using WorkToUnlock.Core.Persistence;
 
@@ -36,8 +37,9 @@ public sealed partial class StatisticsViewModel : ObservableObject
     private readonly MetricViewModel _earned = new("Rewards earned");
     private readonly MetricViewModel _rewardTime = new("Reward time activated") { Detail = "Total unlocked time granted" };
     private readonly MetricViewModel _blocked = new("Blocked today");
+    private readonly MetricViewModel _streak = new("Streak");
 
-    public IReadOnlyList<MetricViewModel> Metrics => [_today, _week, _blocked, _earned, _rewardTime];
+    public IReadOnlyList<MetricViewModel> Metrics => [_today, _week, _streak, _blocked, _earned, _rewardTime];
 
     [ObservableProperty]
     public partial string TodayText { get; set; } = "–";
@@ -72,9 +74,11 @@ public sealed partial class StatisticsViewModel : ObservableObject
         }
 
         StatisticsReport? report;
+        DailyProgress? progress;
         try
         {
             report = await agent.RequestAsync<StatisticsReport>(AgentMethods.GetStatistics);
+            progress = await agent.RequestAsync<DailyProgress>(AgentMethods.GetDailyProgress);
             ErrorText = null;
         }
         catch (Exception ex) when (ex is InvalidOperationException or IOException or Infrastructure.Ipc.IpcException or TimeoutException)
@@ -98,6 +102,11 @@ public sealed partial class StatisticsViewModel : ObservableObject
         _earned.Value = RewardsEarnedText;
         _earned.Detail = RewardsActivatedText;
         _rewardTime.Value = RewardMinutesText;
+        var goal = progress?.Goal ?? TimeSpan.Zero;
+        _streak.Value = progress is { GoalEnabled: true } ? (progress.CurrentStreak == 1 ? "1 day" : $"{progress.CurrentStreak} days") : "Off";
+        _streak.Detail = progress is { GoalEnabled: true }
+            ? $"Best {progress.BestStreak} · goal {Format.Duration(goal)} a day"
+            : "Set a daily goal in Settings to build a streak";
         _blocked.Value = report.BlockedToday == 1 ? "1 attempt" : $"{report.BlockedToday} attempts";
         _blocked.Detail = report.BlockedToday == 0
             ? "No locked apps opened today"
@@ -122,16 +131,18 @@ public sealed partial class StatisticsViewModel : ObservableObject
                 day.Date.ToString("d", CultureInfo.CurrentCulture),
                 Format.Duration(day.QualifyingWork),
                 height,
-                day.BlockedAttempts));
+                day.BlockedAttempts,
+                goal > TimeSpan.Zero && day.QualifyingWork >= goal));
         }
     }
 }
 
 public sealed record ApplicationBarViewModel(string Name, string TimeText, double Percent);
 
-public sealed record DayBarViewModel(string Label, string DateText, string TimeText, double BarHeight, int BlockedAttempts)
+public sealed record DayBarViewModel(string Label, string DateText, string TimeText, double BarHeight, int BlockedAttempts, bool GoalMet)
 {
-    public string ToolTip => BlockedAttempts == 0
-        ? $"{DateText}: {TimeText}"
-        : $"{DateText}: {TimeText}, {BlockedAttempts} blocked {(BlockedAttempts == 1 ? "attempt" : "attempts")}";
+    public bool GoalMissed => !GoalMet;
+
+    public string ToolTip => (GoalMet ? $"{DateText}: {TimeText}, goal reached" : $"{DateText}: {TimeText}")
+        + (BlockedAttempts == 0 ? string.Empty : $", {BlockedAttempts} blocked {(BlockedAttempts == 1 ? "attempt" : "attempts")}");
 }

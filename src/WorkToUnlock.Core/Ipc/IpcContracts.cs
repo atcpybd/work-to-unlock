@@ -49,6 +49,7 @@ public static class AgentMethods
     public const string GetAuditEvents = "getAuditEvents";
     public const string ShowDashboard = "showDashboard";
     public const string ExitDashboards = "exitDashboards";
+    public const string GetDailyProgress = "getDailyProgress";
 }
 
 /// <summary>Events pushed by the agent to subscribed dashboards.</summary>

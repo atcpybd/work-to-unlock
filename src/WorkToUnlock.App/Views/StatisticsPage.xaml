@@ -41,7 +41,8 @@
 
             <Border Style="{StaticResource CardStyle}">
                 <StackPanel Spacing="8">
-                    <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="Last 14 days" AutomationProperties.HeadingLevel="Level2" />
+                    <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="Last 14 days" AutomationProperties.HeadingLevel="Level2" Margin="0" />
+                    <TextBlock Style="{StaticResource SecondaryTextStyle}" Text="Highlighted days reached your daily goal." />
                     <ItemsControl ItemsSource="{x:Bind ViewModel.Days}" Height="190" IsTabStop="False">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
@@ -55,7 +56,8 @@
                                         <RowDefinition Height="*" />
                                         <RowDefinition Height="Auto" />
                                     </Grid.RowDefinitions>
-                                    <Rectangle Width="26" Height="{x:Bind BarHeight}" VerticalAlignment="Bottom" RadiusX="4" RadiusY="4" Fill="{ThemeResource AccentFillColorDefaultBrush}" />
+                                    <Rectangle Width="26" Height="{x:Bind BarHeight}" VerticalAlignment="Bottom" RadiusX="4" RadiusY="4" Fill="{ThemeResource AccentFillColorDefaultBrush}" Visibility="{x:Bind GoalMet}" />
+                                    <Rectangle Width="26" Height="{x:Bind BarHeight}" VerticalAlignment="Bottom" RadiusX="4" RadiusY="4" Fill="{ThemeResource ControlStrongFillColorDisabledBrush}" Visibility="{x:Bind GoalMissed}" />
                                     <TextBlock Grid.Row="1" Margin="0,6,0,0" HorizontalAlignment="Center" Style="{StaticResource SecondaryTextStyle}" Text="{x:Bind Label}" />
                                 </Grid>
                             </DataTemplate>

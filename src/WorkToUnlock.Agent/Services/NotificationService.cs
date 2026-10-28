@@ -45,6 +45,16 @@ public sealed class NotificationService(ITrayPresenter tray, SettingsService set
         Show($"closing:{rule.Id}", BlockedCooldown, "Reward time is over", message);
     }
 
+    public void NotifyDailyGoalReached(DailyProgress progress)
+    {
+        var streak = progress.CurrentStreak switch
+        {
+            <= 1 => "Come back tomorrow to start a streak.",
+            var days => $"That's a {days}-day streak.",
+        };
+        Show($"goal:{clock.UtcNow:yyyyMMdd}", TimeSpan.Zero, "Daily goal reached!", $"{Format(progress.Goal)} of focused work today. {streak}");
+    }
+
     /// <summary>Called by the main loop: warns before an active reward ends.</summary>
     public void CheckRewardCountdown(RewardStatus status)
     {

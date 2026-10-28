@@ -46,6 +46,7 @@ public sealed partial class DashboardViewModel : ObservableObject
             {
                 await LoadRulesAsync();
                 await LoadSettingsAsync();
+                await LoadProgressAsync();
             }
         };
         if (agent.LastStatus is { } last)
@@ -143,6 +144,65 @@ public sealed partial class DashboardViewModel : ObservableObject
 
     [ObservableProperty]
     public partial bool HasNoRestrictedApps { get; set; }
+
+    [ObservableProperty]
+    public partial string TodayText { get; set; } = "–";
+
+    [ObservableProperty]
+    public partial double GoalPercent { get; set; }
+
+    [ObservableProperty]
+    public partial bool HasGoal { get; set; }
+
+    [ObservableProperty]
+    public partial string GoalStatusText { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial string StreakText { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial string BlockedTodayText { get; set; } = string.Empty;
+
+    /// <summary>Refreshes today's goal progress, streak and blocked attempts from the agent.</summary>
+    public async Task LoadProgressAsync()
+    {
+        if (!_agent.IsConnected)
+        {
+            return;
+        }
+
+        try
+        {
+            if (await _agent.RequestAsync<DailyProgress>(AgentMethods.GetDailyProgress) is { } progress)
+            {
+                ApplyProgress(progress);
+            }
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or IOException or Infrastructure.Ipc.IpcException or TimeoutException)
+        {
+        }
+    }
+
+    private void ApplyProgress(DailyProgress progress)
+    {
+        HasGoal = progress.GoalEnabled;
+        GoalPercent = progress.Fraction * 100;
+        TodayText = progress.GoalEnabled
+            ? $"{Format.Duration(progress.Today)} of {Format.Duration(progress.Goal)}"
+            : $"{Format.Duration(progress.Today)} of work";
+        GoalStatusText = !progress.GoalEnabled ? "No daily goal set. You can add one in Settings."
+            : progress.GoalMet ? "Daily goal reached. Nice work!"
+            : $"{Format.DurationCeiling(progress.Goal - progress.Today)} to go for today's goal";
+        StreakText = !progress.GoalEnabled ? "No streak without a daily goal"
+            : progress.CurrentStreak == 0 ? (progress.BestStreak == 0 ? "No streak yet" : $"No streak right now (best {progress.BestStreak})")
+            : $"{progress.CurrentStreak}-day streak (best {progress.BestStreak})";
+        BlockedTodayText = progress.BlockedToday switch
+        {
+            0 => "No blocked attempts today",
+            1 => "1 blocked attempt today",
+            var n => $"{n} blocked attempts today",
+        };
+    }
 
     /// <summary>True when there is something to reset: work time so far, a ready break, or a running break.</summary>
     [ObservableProperty]

@@ -22,6 +22,7 @@ public sealed class AgentService(IServiceProvider services, ILogger<AgentService
     internal static readonly TimeSpan SampleInterval = TimeSpan.FromMilliseconds(500);
     private static readonly TimeSpan StatusInterval = TimeSpan.FromSeconds(1);
     private static readonly TimeSpan MaintenanceInterval = TimeSpan.FromHours(1);
+    private static readonly TimeSpan ProgressInterval = TimeSpan.FromSeconds(30);
 
     private PipeServer? _pipeServer;
 
@@ -168,8 +169,10 @@ public sealed class AgentService(IServiceProvider services, ILogger<AgentService
         var notifications = services.GetRequiredService<NotificationService>();
         var maintenance = services.GetRequiredService<MaintenanceService>();
 
+        var progress = services.GetRequiredService<ProgressService>();
         var statusCadence = new Cadence(StatusInterval);
         var maintenanceCadence = new Cadence(MaintenanceInterval);
+        var progressCadence = new Cadence(ProgressInterval);
         using var timer = new PeriodicTimer(SampleInterval);
         do
         {
@@ -193,6 +196,21 @@ public sealed class AgentService(IServiceProvider services, ILogger<AgentService
             if (maintenanceCadence.IsDue(now))
             {
                 _ = Task.Run(() => maintenance.RunIfDueAsync(cancellationToken), cancellationToken);
+            }
+
+            if (progressCadence.IsDue(now))
+            {
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await progress.GetAsync(cancellationToken, refresh: true).ConfigureAwait(false);
+                    }
+                    catch (Exception ex) when (ex is not OperationCanceledException)
+                    {
+                        logger.LogWarning(ex, "Daily progress check failed");
+                    }
+                }, cancellationToken);
             }
         }
         while (await timer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false));

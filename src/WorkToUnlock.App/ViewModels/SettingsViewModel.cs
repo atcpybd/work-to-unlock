@@ -63,6 +63,9 @@ public sealed partial class SettingsViewModel : ObservableObject
     public partial double GracefulCloseTimeoutSeconds { get; set; } = 15;
 
     [ObservableProperty]
+    public partial double DailyGoalMinutes { get; set; } = 120;
+
+    [ObservableProperty]
     public partial double DataRetentionDays { get; set; } = 90;
 
     [ObservableProperty]
@@ -131,6 +134,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             IdleThresholdSeconds = ToInt(IdleThresholdSeconds),
             GracefulCloseTimeoutSeconds = ToInt(GracefulCloseTimeoutSeconds),
             DataRetentionDays = ToInt(DataRetentionDays),
+            DailyGoalMinutes = ToInt(DailyGoalMinutes),
             EnforcementMode = (EnforcementMode)Math.Clamp(EnforcementModeIndex, 0, 2),
             Theme = (ThemePreference)Math.Clamp(ThemeIndex, 0, 2),
             StartWithWindows = StartWithWindows,
@@ -308,6 +312,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         IdleThresholdSeconds = settings.IdleThresholdSeconds;
         GracefulCloseTimeoutSeconds = settings.GracefulCloseTimeoutSeconds;
         DataRetentionDays = settings.DataRetentionDays;
+        DailyGoalMinutes = settings.DailyGoalMinutes;
         EnforcementModeIndex = (int)settings.EnforcementMode;
         ThemeIndex = (int)settings.Theme;
         StartWithWindows = settings.StartWithWindows;
@@ -335,7 +340,7 @@ public sealed partial class SettingsViewModel : ObservableObject
     {
         base.OnPropertyChanged(e);
         if (!_loading && e.PropertyName is nameof(WorkRequirementMinutes) or nameof(RewardDurationMinutes) or nameof(IdleThresholdSeconds)
-                or nameof(GracefulCloseTimeoutSeconds) or nameof(DataRetentionDays) or nameof(EnforcementModeIndex) or nameof(ThemeIndex)
+                or nameof(GracefulCloseTimeoutSeconds) or nameof(DataRetentionDays) or nameof(DailyGoalMinutes) or nameof(EnforcementModeIndex) or nameof(ThemeIndex)
                 or nameof(StartWithWindows) or nameof(MinimizeToTray) or nameof(NotificationsEnabled))
         {
             HasChanges = true;

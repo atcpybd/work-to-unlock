@@ -76,6 +76,7 @@ internal static class AgentComposition
         services.AddSingleton<AgentRequestHandler>();
         services.AddSingleton<DefaultRulesSeeder>();
         services.AddSingleton<MaintenanceService>();
+        services.AddSingleton<ProgressService>();
 
         // Tray and OS integration
         services.AddSingleton<AgentWindow>();

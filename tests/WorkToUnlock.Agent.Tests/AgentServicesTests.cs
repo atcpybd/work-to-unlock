@@ -69,7 +69,8 @@ internal sealed class AgentHarness : IDisposable
         var info = new AgentInfo();
         var status = new AgentStatusService(Engine, tracker, Coordinator, Settings, info, Clock);
         var bridge = new DashboardBridge(hub ?? new AgentEventHub(), info, NullLogger<DashboardBridge>.Instance);
-        return new AgentRequestHandler(status, Engine, Rules, Settings, Discovery, new NullStatistics(), Audit, Strict, bridge, TestRules.Folders, Clock, NullLogger<AgentRequestHandler>.Instance);
+        var progress = new ProgressService(Statistics, Settings, Notifications, Clock, NullLogger<ProgressService>.Instance);
+        return new AgentRequestHandler(status, Engine, Rules, Settings, Discovery, Statistics, Audit, Strict, bridge, progress, TestRules.Folders, Clock, NullLogger<AgentRequestHandler>.Instance);
     }
 
     /// <summary>Waits for event-triggered reconciliations (they run on the thread pool).</summary>
@@ -81,12 +82,17 @@ internal sealed class AgentHarness : IDisposable
         Coordinator.Dispose();
     }
 
-    private sealed class NullStatistics : IStatisticsStore
+    public FakeStatistics Statistics { get; } = new();
+
+    internal sealed class FakeStatistics : IStatisticsStore
     {
+        /// <summary>Daily totals returned to callers, oldest first, ending today.</summary>
+        public List<DailyActivity> Days { get; set; } = [];
+
         public Task<StatisticsReport> GetReportAsync(DateTimeOffset now, TimeZoneInfo timeZone, int historyDays, CancellationToken cancellationToken) => Task.FromResult(new StatisticsReport());
 
         public Task<IReadOnlyList<DailyActivity>> GetDailyTotalsAsync(DateTimeOffset now, TimeZoneInfo timeZone, int days, CancellationToken cancellationToken) =>
-            Task.FromResult<IReadOnlyList<DailyActivity>>([]);
+            Task.FromResult<IReadOnlyList<DailyActivity>>(Days.ToList());
 
         public Task<int> PruneAsync(DateTimeOffset cutoffUtc, CancellationToken cancellationToken) => Task.FromResult(0);
 
@@ -329,6 +335,61 @@ public sealed class AgentRequestHandlerTests : IDisposable
 
         Assert.Equal(RewardState.Working, parsed!.Reward.State);
         Assert.Equal(TimeSpan.FromMinutes(60), parsed.Reward.RequiredWork);
+    }
+}
+
+public sealed class ProgressServiceTests : IDisposable
+{
+    private readonly AgentHarness _h = new();
+
+    public void Dispose() => _h.Dispose();
+
+    private ProgressService Create() =>
+        new(_h.Statistics, _h.Settings, _h.Notifications, _h.Clock, NullLogger<ProgressService>.Instance) { TimeZone = TimeZoneInfo.Utc };
+
+    private void WorkedToday(int minutes) =>
+        _h.Statistics.Days = [new DailyActivity(DateOnly.FromDateTime(_h.Clock.UtcNow.UtcDateTime), TimeSpan.FromMinutes(minutes))];
+
+    [Fact]
+    public async Task Notifies_once_when_the_daily_goal_is_crossed()
+    {
+        await _h.StartAsync();
+        var progress = Create();
+
+        WorkedToday(100);
+        await progress.GetAsync(CancellationToken.None, refresh: true);
+        WorkedToday(125);
+        var reached = await progress.GetAsync(CancellationToken.None, refresh: true);
+        await progress.GetAsync(CancellationToken.None, refresh: true);
+
+        Assert.True(reached.GoalMet);
+        Assert.Single(_h.Tray.Notifications, n => n.Title == "Daily goal reached!");
+    }
+
+    [Fact]
+    public async Task Starting_on_a_day_already_done_does_not_notify()
+    {
+        await _h.StartAsync();
+        var progress = Create();
+
+        WorkedToday(150);
+        await progress.GetAsync(CancellationToken.None, refresh: true);
+        await progress.GetAsync(CancellationToken.None, refresh: true);
+
+        Assert.DoesNotContain(_h.Tray.Notifications, n => n.Title == "Daily goal reached!");
+    }
+
+    [Fact]
+    public async Task Uses_the_daily_goal_setting()
+    {
+        _h.SettingsStore.Settings = AppSettings.Default with { DailyGoalMinutes = 30 };
+        await _h.StartAsync();
+        WorkedToday(45);
+
+        var progress = await Create().GetAsync(CancellationToken.None);
+
+        Assert.Equal(TimeSpan.FromMinutes(30), progress.Goal);
+        Assert.True(progress.GoalMet);
     }
 }
 

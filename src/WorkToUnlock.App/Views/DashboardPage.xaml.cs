@@ -25,9 +25,31 @@ public sealed partial class DashboardPage : Page
     protected override async void OnNavigatedTo(NavigationEventArgs e)
     {
         base.OnNavigatedTo(e);
+
+        // Daily totals come from saved sessions, so a slow refresh is enough.
+        _progressTimer ??= DispatcherQueue.CreateTimer();
+        _progressTimer.Interval = TimeSpan.FromSeconds(20);
+        _progressTimer.Tick += OnProgressTimerTick;
+        _progressTimer.Start();
+
         await ViewModel.LoadRulesAsync();
         await ViewModel.LoadSettingsAsync();
+        await ViewModel.LoadProgressAsync();
     }
+
+    protected override void OnNavigatedFrom(NavigationEventArgs e)
+    {
+        base.OnNavigatedFrom(e);
+        if (_progressTimer is not null)
+        {
+            _progressTimer.Stop();
+            _progressTimer.Tick -= OnProgressTimerTick;
+        }
+    }
+
+    private Microsoft.UI.Dispatching.DispatcherQueueTimer? _progressTimer;
+
+    private async void OnProgressTimerTick(Microsoft.UI.Dispatching.DispatcherQueueTimer sender, object args) => await ViewModel.LoadProgressAsync();
 
     private async Task<(int WorkMinutes, int BreakMinutes)?> AskCustomTimesAsync(int workMinutes, int breakMinutes)
     {

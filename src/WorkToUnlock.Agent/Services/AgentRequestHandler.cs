@@ -23,6 +23,7 @@ public sealed class AgentRequestHandler(
     IAuditLog audit,
     IStrictEnforcementClient strictClient,
     DashboardBridge dashboards,
+    ProgressService progress,
     SystemFolders folders,
     IClock clock,
     ILogger<AgentRequestHandler> logger) : IIpcRequestHandler
@@ -83,6 +84,9 @@ public sealed class AgentRequestHandler(
 
             case AgentMethods.GetStatistics:
                 return await statistics.GetReportAsync(clock.UtcNow, TimeZoneInfo.Local, HistoryDays, cancellationToken).ConfigureAwait(false);
+
+            case AgentMethods.GetDailyProgress:
+                return await progress.GetAsync(cancellationToken).ConfigureAwait(false);
 
             case AgentMethods.GetRuleTimes:
                 return await GetRuleTimesAsync(cancellationToken).ConfigureAwait(false);

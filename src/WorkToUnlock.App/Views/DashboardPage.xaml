@@ -92,6 +92,32 @@
                 </Grid>
             </Border>
 
+            <!-- Today: daily goal, streak, blocked attempts -->
+            <Border Style="{StaticResource CardStyle}">
+                <Grid ColumnSpacing="32">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Spacing="6">
+                        <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="Today" AutomationProperties.HeadingLevel="Level2" />
+                        <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="{x:Bind ViewModel.TodayText, Mode=OneWay}" />
+                        <ProgressBar Maximum="100" Value="{x:Bind ViewModel.GoalPercent, Mode=OneWay}" Visibility="{x:Bind ViewModel.HasGoal, Mode=OneWay}" AutomationProperties.Name="Daily goal progress" />
+                        <TextBlock Style="{StaticResource SecondaryTextStyle}" Text="{x:Bind ViewModel.GoalStatusText, Mode=OneWay}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="10">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <FontIcon FontSize="18" Foreground="{ThemeResource SystemFillColorCautionBrush}" Glyph="&#xE735;" />
+                            <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{x:Bind ViewModel.StreakText, Mode=OneWay}" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <FontIcon FontSize="18" Glyph="&#xE72E;" />
+                            <TextBlock Text="{x:Bind ViewModel.BlockedTodayText, Mode=OneWay}" />
+                        </StackPanel>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
             <!-- Work / break presets -->
             <Border Style="{StaticResource CardStyle}">
                 <StackPanel Spacing="12">
