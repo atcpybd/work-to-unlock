@@ -55,10 +55,10 @@ Acceptance: users can configure and operate the complete workflow without editin
 - ✅ Crash recovery: `RegisterApplicationRestart`, dashboard restarts the agent, state restored from SQLite
 - ✅ Self-contained publish (verified to run with no .NET installed on the PATH), portable zip
 - ✅ WiX MSI: per-machine, Start menu shortcut, Run entry, optional strict-service feature, closes running instances, AppLocker rollback on uninstall. Builds with ICE validation (targeted suppressions documented in the `.wixproj`).
-- ✅ GitHub Actions: Linux portable build + tests; Windows build, unit + integration tests, publish, MSI artifacts; tag-triggered draft release with checksums
+- ✅ GitHub Actions: Linux portable build + tests; Windows build, unit + integration tests, publish, MSI artifacts; tag-triggered release with checksums (published, not draft, so the update check can find it)
 - ✅ Recovery and limitations documented
-- 🔲 Install → sign out/in → uninstall on a clean VM. The MSI was **not** installed on the development machine: that changes system state and needs your approval.
-- 🔲 The workflows have not run on GitHub yet (no remote configured).
+- ✅ Installed and upgraded on the development machine (1.0.x MSIs, with approval each time)
+- 🔲 Install → sign out/in → uninstall on a clean VM.
 
 ## Phase 6: Optional strict enforcement 🧪 / 🔲
 
@@ -70,10 +70,25 @@ Acceptance: users can configure and operate the complete workflow without editin
 
 The MVP does not depend on strict mode.
 
+## Phase 7: Motivation and flexibility (1.1.0) ✅
+
+Database version 2 adds `BlockedAttempts`, `Achievements`, `Downtime` and the reward-state columns for the balance and pause.
+
+- ✅ Blocked attempts per app and day (one launch = one attempt within 15 s)
+- ✅ Daily goal and streaks (current, best, 14-day chart with goal days highlighted)
+- ✅ Honesty report: agent heartbeat every 30 s plus the exit reason; a gap of more than 2 minutes within the same boot, not caused by Windows ending the session, is recorded, as is time with enforcement off
+- ✅ Achievements (12), checked whenever daily progress is recalculated
+- ✅ Pause a running break while locked, asleep or disconnected (setting); the time left is stored, so clock changes can't lengthen it
+- ✅ Earn-as-you-go balance mode with a limit, end-early, and conversion when switching modes
+- ✅ Profiles: work/break times, earning mode, daily goal and allowed restricted apps, switched through the audited settings and rule paths
+- ✅ Update check against this repository's latest GitHub release; *Update now* verifies the MSI against `SHA256SUMS.txt` before running it
+- 🔲 *Update now* end to end from one published release to the next (needs two releases)
+
 ## Remaining work and ideas
 
 - Code-sign the binaries and the MSI. Unsigned builds trigger SmartScreen, and signing lets strict mode use publisher rules.
 - ARM64 builds: the projects and `Publish.ps1 -Architecture arm64` are wired up but untested.
 - Optional Start-menu-shortcut scanning (`.lnk`) to find more installed apps.
 - Localization; all strings are currently English.
-- Choose and add a license. `installer/WorkToUnlock.Installer/License.rtf` is a neutral placeholder notice.
+- Choose and add a license. `installer/WorkToUnlock.Installer/License.rtf` is a neutral placeholder notice. The repository is public, but without a license others may read the code and not reuse it.
+- Record turning a restricted app off on the Applications page in the activity log and the honesty report.
