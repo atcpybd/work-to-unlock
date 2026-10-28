@@ -1,0 +1,23 @@
+## Build output
+bin/
+obj/
+artifacts/
+publish/
+TestResults/
+*.binlog
+
+## IDE
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+*.DotSettings.user
+
+## WiX
+*.wixpdb
+*.wixobj
+
+## OS
+Thumbs.db
+.DS_Store

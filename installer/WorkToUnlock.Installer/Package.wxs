@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
+
+  <Package Name="Work to Unlock"
+           Manufacturer="Work to Unlock"
+           Version="$(var.ProductVersion)"
+           UpgradeCode="6F2E4B8A-3C1D-4E7F-9A5B-2D8C0E1F4A37"
+           Scope="perMachine"
+           Compressed="yes">
+
+    <MajorUpgrade DowngradeErrorMessage="A newer version of Work to Unlock is already installed." />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+
+    <Icon Id="AppIcon" SourceFile="$(var.AssetsDir)\app.ico" />
+    <Property Id="ARPPRODUCTICON" Value="AppIcon" />
+    <Property Id="ARPCOMMENTS" Value="Earn time in distracting apps by working in approved ones." />
+    <Property Id="ARPNOMODIFY" Value="0" />
+
+    <!-- Close the agent and dashboard before files are replaced or removed. The agent exits cleanly on WM_CLOSE. -->
+    <util:CloseApplication Id="CloseAgent" Target="WorkToUnlock.Agent.exe" CloseMessage="yes" ElevatedCloseMessage="yes" TerminateProcess="0" Timeout="15" RebootPrompt="no" />
+    <util:CloseApplication Id="CloseDashboard" Target="WorkToUnlock.App.exe" CloseMessage="yes" ElevatedCloseMessage="yes" TerminateProcess="0" Timeout="10" RebootPrompt="no" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="Work to Unlock" />
+    </StandardDirectory>
+
+    <Feature Id="Main" Title="Work to Unlock" Level="1" AllowAbsent="no"
+             Description="The dashboard and the background agent that tracks work in approved apps and restricts distracting apps.">
+      <ComponentGroupRef Id="ApplicationFiles" />
+      <ComponentRef Id="StartMenuShortcut" />
+      <ComponentRef Id="AgentAutostart" />
+    </Feature>
+
+    <!-- Not installed by default (Level 1000 > INSTALLLEVEL 1). Even when installed it does nothing until an
+         administrator runs "Enable strict mode". -->
+    <Feature Id="StrictEnforcement" Title="Strict enforcement service (optional)" Level="1000"
+             Description="An elevated service that can stop restricted apps from starting by managing Work to Unlock's own AppLocker rules. Inactive until an administrator enables strict mode. Requires Windows Enterprise, Education or Server.">
+      <ComponentRef Id="StrictServiceComponent" />
+    </Feature>
+
+    <ComponentGroup Id="ApplicationFiles" Directory="INSTALLFOLDER">
+      <Files Include="$(var.PublishDir)**">
+        <Exclude Files="$(var.PublishDir)WorkToUnlock.Service.exe" />
+        <Exclude Files="$(var.PublishDir)**.pdb" />
+      </Files>
+    </ComponentGroup>
+
+    <Component Id="StrictServiceComponent" Directory="INSTALLFOLDER" Bitness="always64">
+      <File Id="ServiceExe" Source="$(var.PublishDir)WorkToUnlock.Service.exe" KeyPath="yes" />
+      <ServiceInstall Id="StrictServiceInstall"
+                      Name="WorkToUnlockStrict"
+                      DisplayName="Work to Unlock strict enforcement"
+                      Description="Manages Work to Unlock's own AppLocker rules when an administrator has enabled strict mode."
+                      Type="ownProcess" Start="auto" ErrorControl="normal" Account="LocalSystem" Vital="yes">
+        <util:ServiceConfig FirstFailureActionType="restart" SecondFailureActionType="restart" ThirdFailureActionType="none"
+                            RestartServiceDelayInSeconds="10" ResetPeriodInDays="1" />
+      </ServiceInstall>
+      <ServiceControl Id="StrictServiceControl" Name="WorkToUnlockStrict" Start="install" Stop="both" Remove="uninstall" Wait="yes" />
+    </Component>
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Component Id="StartMenuShortcut" Bitness="always64">
+        <Shortcut Id="DashboardShortcut" Name="Work to Unlock" Description="Open the Work to Unlock dashboard"
+                  Target="[INSTALLFOLDER]WorkToUnlock.App.exe" WorkingDirectory="INSTALLFOLDER" Icon="AppIcon" />
+        <RegistryValue Root="HKLM" Key="Software\WorkToUnlock" Name="StartMenuShortcut" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </StandardDirectory>
+
+    <!-- Starts the agent at every sign-in. Each user's "Start with Windows" setting is honoured by the agent itself. -->
+    <Component Id="AgentAutostart" Directory="INSTALLFOLDER" Bitness="always64">
+      <RegistryValue Root="HKLM" Key="Software\Microsoft\Windows\CurrentVersion\Run" Name="WorkToUnlock"
+                     Type="string" Value="&quot;[INSTALLFOLDER]WorkToUnlock.Agent.exe&quot; --autostart" KeyPath="yes" />
+    </Component>
+
+    <!-- Uninstall (or removing the optional feature): remove every AppLocker rule Work to Unlock created.
+         Never blocks the uninstall; see docs/recovery.md for manual recovery. -->
+    <CustomAction Id="RollbackAppLocker" Directory="INSTALLFOLDER"
+                  ExeCommand="&quot;[INSTALLFOLDER]WorkToUnlock.Service.exe&quot; rollback"
+                  Execute="deferred" Impersonate="no" Return="ignore" />
+    <InstallExecuteSequence>
+      <Custom Action="RollbackAppLocker" Before="StopServices" Condition="(?StrictServiceComponent = 3) AND ($StrictServiceComponent = 2)" />
+    </InstallExecuteSequence>
+
+    <!-- Optional "open now" checkbox on the final page. The dashboard starts the agent if needed. -->
+    <CustomAction Id="LaunchDashboard" Directory="INSTALLFOLDER" ExeCommand="&quot;[INSTALLFOLDER]WorkToUnlock.App.exe&quot;"
+                  Execute="immediate" Impersonate="yes" Return="asyncNoWait" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Open Work to Unlock" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
+
+    <WixVariable Id="WixUILicenseRtf" Value="License.rtf" />
+    <ui:WixUI Id="WixUI_FeatureTree" InstallDirectory="INSTALLFOLDER" />
+    <UI>
+      <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="LaunchDashboard"
+               Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 AND NOT Installed" />
+    </UI>
+  </Package>
+</Wix>

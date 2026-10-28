@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="WorkToUnlock.App.Views.ApplicationsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:vm="using:WorkToUnlock.App.ViewModels">
+
+    <Page.Resources>
+        <DataTemplate x:Key="WorkAppTemplate" x:DataType="vm:RuleItemViewModel">
+            <Grid Padding="0,12" ColumnSpacing="14" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,1,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <Grid Width="32" Height="32" VerticalAlignment="Top"><FontIcon Glyph="&#xECAA;" FontSize="24" Foreground="{ThemeResource TextFillColorTertiaryBrush}" /><Image Source="{x:Bind Icon, Mode=OneWay}" /></Grid>
+                <StackPanel Grid.Column="1" Spacing="2">
+                    <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{x:Bind Name}" />
+                    <TextBlock Style="{StaticResource SecondaryTextStyle}" Text="{x:Bind ExecutablePath}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" IsTextSelectionEnabled="True" ToolTipService.ToolTip="{x:Bind ExecutablePath}" />
+                    <TextBlock Style="{StaticResource SecondaryTextStyle}">
+                        <Run Text="{x:Bind Publisher}" /><Run Text=" · " /><Run Text="{x:Bind ScopeText}" />
+                    </TextBlock>
+                    <TextBlock Style="{StaticResource SecondaryTextStyle}" Text="{x:Bind TodayText}" />
+                    <TextBlock Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource SystemFillColorCriticalBrush}" Text="Executable not found. Use Revalidate or Change location." Visibility="{x:Bind Missing}" />
+                </StackPanel>
+                <CheckBox Grid.Column="2" VerticalAlignment="Center" Content="Counts toward goal" IsChecked="{x:Bind CountsTowardGoal, Mode=TwoWay}" />
+                <ToggleSwitch Grid.Column="3" VerticalAlignment="Center" MinWidth="0" IsOn="{x:Bind Enabled, Mode=TwoWay}" OffContent="Off" OnContent="On" AutomationProperties.Name="Enabled" />
+                <Button Grid.Column="4" VerticalAlignment="Center" AutomationProperties.Name="More options" Background="Transparent" BorderThickness="0">
+                    <FontIcon FontSize="16" Glyph="&#xE712;" />
+                    <Button.Flyout>
+                        <MenuFlyout Placement="BottomEdgeAlignedRight">
+                            <MenuFlyoutItem Command="{x:Bind RevalidateCommand}" Text="Revalidate identity">
+                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE72C;" /></MenuFlyoutItem.Icon>
+                            </MenuFlyoutItem>
+                            <MenuFlyoutItem Command="{x:Bind ChangeLocationCommand}" Text="Change location…">
+                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE8B7;" /></MenuFlyoutItem.Icon>
+                            </MenuFlyoutItem>
+                            <MenuFlyoutSeparator />
+                            <MenuFlyoutItem Command="{x:Bind RemoveCommand}" Text="Remove">
+                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE74D;" /></MenuFlyoutItem.Icon>
+                            </MenuFlyoutItem>
+                        </MenuFlyout>
+                    </Button.Flyout>
+                </Button>
+            </Grid>
+        </DataTemplate>
+
+        <DataTemplate x:Key="RestrictedAppTemplate" x:DataType="vm:RuleItemViewModel">
+            <Grid Padding="0,12" ColumnSpacing="14" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,1,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <Grid Width="32" Height="32" VerticalAlignment="Top"><FontIcon Glyph="&#xECAA;" FontSize="24" Foreground="{ThemeResource TextFillColorTertiaryBrush}" /><Image Source="{x:Bind Icon, Mode=OneWay}" /></Grid>
+                <StackPanel Grid.Column="1" Spacing="2">
+                    <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{x:Bind Name}" />
+                    <TextBlock Style="{StaticResource SecondaryTextStyle}" Text="{x:Bind ExecutablePath}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" IsTextSelectionEnabled="True" ToolTipService.ToolTip="{x:Bind ExecutablePath}" />
+                    <TextBlock Style="{StaticResource SecondaryTextStyle}">
+                        <Run Text="{x:Bind Publisher}" /><Run Text=" · " /><Run Text="{x:Bind ScopeText}" />
+                    </TextBlock>
+                    <TextBlock Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource SystemFillColorCriticalBrush}" Text="Executable not found. Use Revalidate or Change location." Visibility="{x:Bind Missing}" />
+                </StackPanel>
+                <Border Grid.Column="2" Style="{StaticResource ChipStyle}">
+                    <TextBlock Style="{StaticResource CaptionTextBlockStyle}" Text="{x:Bind RestrictionText, Mode=OneWay}" />
+                </Border>
+                <ToggleSwitch Grid.Column="3" VerticalAlignment="Center" MinWidth="0" IsOn="{x:Bind Enabled, Mode=TwoWay}" OffContent="Off" OnContent="On" AutomationProperties.Name="Restriction enabled" />
+                <Button Grid.Column="4" VerticalAlignment="Center" AutomationProperties.Name="More options" Background="Transparent" BorderThickness="0">
+                    <FontIcon FontSize="16" Glyph="&#xE712;" />
+                    <Button.Flyout>
+                        <MenuFlyout Placement="BottomEdgeAlignedRight">
+                            <MenuFlyoutItem Command="{x:Bind RevalidateCommand}" Text="Revalidate identity">
+                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE72C;" /></MenuFlyoutItem.Icon>
+                            </MenuFlyoutItem>
+                            <MenuFlyoutItem Command="{x:Bind ChangeLocationCommand}" Text="Change location…">
+                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE8B7;" /></MenuFlyoutItem.Icon>
+                            </MenuFlyoutItem>
+                            <MenuFlyoutSeparator />
+                            <MenuFlyoutItem Command="{x:Bind RemoveCommand}" Text="Remove">
+                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE74D;" /></MenuFlyoutItem.Icon>
+                            </MenuFlyoutItem>
+                        </MenuFlyout>
+                    </Button.Flyout>
+                </Button>
+            </Grid>
+        </DataTemplate>
+    </Page.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel MaxWidth="{StaticResource PageMaxWidth}" Padding="{StaticResource PagePadding}" Spacing="16">
+            <StackPanel Spacing="4">
+                <TextBlock Style="{StaticResource PageTitleStyle}" Text="Applications" AutomationProperties.HeadingLevel="Level1" />
+                <TextBlock Style="{StaticResource SecondaryTextStyle}" Text="Apps are identified by their file location, digital signature and install folder, never by process name alone." />
+            </StackPanel>
+            <ProgressBar IsIndeterminate="True" Visibility="{x:Bind ViewModel.IsBusy, Mode=OneWay}" />
+
+            <Border Style="{StaticResource CardStyle}">
+                <StackPanel>
+                    <Grid Margin="0,0,0,12" ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Spacing="2">
+                            <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="Work applications" AutomationProperties.HeadingLevel="Level2" />
+                            <TextBlock Style="{StaticResource SecondaryTextStyle}" Text="Time counts only while one of these is in the foreground and you are actively using the PC." />
+                        </StackPanel>
+                        <DropDownButton Grid.Column="1" VerticalAlignment="Top" AutomationProperties.Name="Add work application">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon FontSize="14" Glyph="&#xE710;" />
+                                <TextBlock Text="Add application" />
+                            </StackPanel>
+                            <DropDownButton.Flyout>
+                                <MenuFlyout Placement="BottomEdgeAlignedRight">
+                                    <MenuFlyoutItem Command="{x:Bind ViewModel.ChooseInstalledWorkAppCommand}" Text="Choose from installed apps…" />
+                                    <MenuFlyoutItem Command="{x:Bind ViewModel.BrowseWorkAppCommand}" Text="Browse for an .exe file…" />
+                                </MenuFlyout>
+                            </DropDownButton.Flyout>
+                        </DropDownButton>
+                    </Grid>
+                    <TextBlock Style="{StaticResource SecondaryTextStyle}" Text="No work applications yet." Visibility="{x:Bind ViewModel.HasNoWorkApps, Mode=OneWay}" />
+                    <ItemsControl ItemTemplate="{StaticResource WorkAppTemplate}" ItemsSource="{x:Bind ViewModel.WorkApps}" IsTabStop="False" />
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource CardStyle}">
+                <StackPanel>
+                    <Grid Margin="0,0,0,12" ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Spacing="2">
+                            <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="Restricted applications" AutomationProperties.HeadingLevel="Level2" />
+                            <TextBlock Style="{StaticResource SecondaryTextStyle}" Text="Blocked until you earn a reward. Helper and updater programs in the same install folder are included." />
+                        </StackPanel>
+                        <DropDownButton Grid.Column="1" VerticalAlignment="Top" AutomationProperties.Name="Add restricted application">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon FontSize="14" Glyph="&#xE710;" />
+                                <TextBlock Text="Add application" />
+                            </StackPanel>
+                            <DropDownButton.Flyout>
+                                <MenuFlyout Placement="BottomEdgeAlignedRight">
+                                    <MenuFlyoutItem Command="{x:Bind ViewModel.ChooseInstalledRestrictedAppCommand}" Text="Choose from installed apps…" />
+                                    <MenuFlyoutItem Command="{x:Bind ViewModel.BrowseRestrictedAppCommand}" Text="Browse for an .exe file…" />
+                                </MenuFlyout>
+                            </DropDownButton.Flyout>
+                        </DropDownButton>
+                    </Grid>
+                    <TextBlock Style="{StaticResource SecondaryTextStyle}" Text="No restricted applications yet." Visibility="{x:Bind ViewModel.HasNoRestrictedApps, Mode=OneWay}" />
+                    <ItemsControl ItemTemplate="{StaticResource RestrictedAppTemplate}" ItemsSource="{x:Bind ViewModel.RestrictedApps}" IsTabStop="False" />
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</Page>

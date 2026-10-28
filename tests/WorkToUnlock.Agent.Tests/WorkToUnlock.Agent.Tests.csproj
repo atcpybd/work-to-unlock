@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+    <Using Include="WorkToUnlock.Testing" />
+    <Compile Include="..\Shared\**\*.cs" LinkBase="Shared" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\WorkToUnlock.Core\WorkToUnlock.Core.csproj" />
+    <ProjectReference Include="..\..\src\WorkToUnlock.Infrastructure\WorkToUnlock.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\WorkToUnlock.Enforcement\WorkToUnlock.Enforcement.csproj" />
+    <ProjectReference Include="..\..\src\WorkToUnlock.Agent\WorkToUnlock.Agent.csproj" />
+  </ItemGroup>
+
+</Project>

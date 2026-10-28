@@ -1,0 +1,224 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="WorkToUnlock.App.Views.SettingsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:vm="using:WorkToUnlock.App.ViewModels">
+
+    <Page.Resources>
+        <Style x:Key="SettingRowStyle" TargetType="Grid">
+            <Setter Property="ColumnSpacing" Value="24" />
+            <Setter Property="Padding" Value="0,12" />
+            <Setter Property="BorderBrush" Value="{ThemeResource DividerStrokeColorDefaultBrush}" />
+            <Setter Property="BorderThickness" Value="0,1,0,0" />
+        </Style>
+        <Style x:Key="SettingNumberStyle" TargetType="NumberBox">
+            <Setter Property="Width" Value="160" />
+            <Setter Property="SpinButtonPlacementMode" Value="Inline" />
+            <Setter Property="SmallChange" Value="1" />
+            <Setter Property="LargeChange" Value="10" />
+            <Setter Property="ValidationMode" Value="InvalidInputOverwritten" />
+        </Style>
+    </Page.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel MaxWidth="{StaticResource PageMaxWidth}" Padding="{StaticResource PagePadding}" Spacing="16">
+                <TextBlock Style="{StaticResource PageTitleStyle}" Text="Settings" AutomationProperties.HeadingLevel="Level1" />
+
+                <InfoBar IsOpen="{x:Bind ViewModel.HasValidationMessage, Mode=OneWay}" IsClosable="False" Severity="Error" Title="Settings were not saved" Message="{x:Bind ViewModel.ValidationMessage, Mode=OneWay}" />
+
+                <!-- Work and rewards -->
+                <Border Style="{StaticResource CardStyle}">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="Work and rewards" AutomationProperties.HeadingLevel="Level2" />
+                        <Grid Style="{StaticResource SettingRowStyle}" BorderThickness="0">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="Work requirement" />
+                                <TextBlock Style="{StaticResource SecondaryTextStyle}" Text="Minutes of active work in approved apps needed to earn a reward (1–720)." />
+                            </StackPanel>
+                            <NumberBox Grid.Column="1" Style="{StaticResource SettingNumberStyle}" Minimum="1" Maximum="720" Value="{x:Bind ViewModel.WorkRequirementMinutes, Mode=TwoWay}" AutomationProperties.Name="Work requirement in minutes" />
+                        </Grid>
+                        <Grid Style="{StaticResource SettingRowStyle}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="Reward duration" />
+                                <TextBlock Style="{StaticResource SecondaryTextStyle}" Text="Minutes restricted apps stay unlocked after you activate a reward (1–240). An active reward keeps its original length." />
+                            </StackPanel>
+                            <NumberBox Grid.Column="1" Style="{StaticResource SettingNumberStyle}" Minimum="1" Maximum="240" Value="{x:Bind ViewModel.RewardDurationMinutes, Mode=TwoWay}" AutomationProperties.Name="Reward duration in minutes" />
+                        </Grid>
+                        <Grid Style="{StaticResource SettingRowStyle}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="Idle threshold" />
+                                <TextBlock Style="{StaticResource SecondaryTextStyle}" Text="Seconds without keyboard or mouse input after which work time stops counting (10–3600)." />
+                            </StackPanel>
+                            <NumberBox Grid.Column="1" Style="{StaticResource SettingNumberStyle}" Minimum="10" Maximum="3600" LargeChange="30" Value="{x:Bind ViewModel.IdleThresholdSeconds, Mode=TwoWay}" AutomationProperties.Name="Idle threshold in seconds" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- Enforcement -->
+                <Border Style="{StaticResource CardStyle}">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="Enforcement" AutomationProperties.HeadingLevel="Level2" />
+                        <TextBlock Style="{StaticResource SecondaryTextStyle}" Text="{x:Bind ViewModel.EnforcementStatus, Mode=OneWay}" Margin="0,0,0,8" />
+                        <Grid Style="{StaticResource SettingRowStyle}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="Enforcement mode" />
+                                <TextBlock Style="{StaticResource SecondaryTextStyle}" Text="Close-only asks restricted apps to close. Close-then-terminate force-closes them after the grace period. Strict also blocks launches with AppLocker (optional service, administrator setup)." />
+                            </StackPanel>
+                            <ComboBox Grid.Column="1" Width="220" SelectedIndex="{x:Bind ViewModel.EnforcementModeIndex, Mode=TwoWay}" AutomationProperties.Name="Enforcement mode">
+                                <ComboBoxItem Content="Close only" />
+                                <ComboBoxItem Content="Close, then terminate" />
+                                <ComboBoxItem Content="Strict (AppLocker)" />
+                            </ComboBox>
+                        </Grid>
+                        <Grid Style="{StaticResource SettingRowStyle}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="Graceful-close timeout" />
+                                <TextBlock Style="{StaticResource SecondaryTextStyle}" Text="Seconds a restricted app that is already open gets to close (and you get to save) when a reward ends (3–300)." />
+                            </StackPanel>
+                            <NumberBox Grid.Column="1" Style="{StaticResource SettingNumberStyle}" Minimum="3" Maximum="300" Value="{x:Bind ViewModel.GracefulCloseTimeoutSeconds, Mode=TwoWay}" AutomationProperties.Name="Graceful close timeout in seconds" />
+                        </Grid>
+                        <Grid Style="{StaticResource SettingRowStyle}" Visibility="{x:Bind ViewModel.StrictServiceInstalled}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="Strict mode" />
+                                <TextBlock Style="{StaticResource SecondaryTextStyle}" Text="Allow the optional service to manage Work to Unlock's own AppLocker rules on this PC. Requires administrator approval." />
+                            </StackPanel>
+                            <Button Grid.Column="1" Content="Enable strict mode…" Command="{x:Bind ViewModel.EnableStrictModeCommand}" />
+                        </Grid>
+                        <Grid Style="{StaticResource SettingRowStyle}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="Enforce restrictions" />
+                                <TextBlock Style="{StaticResource SecondaryTextStyle}" Text="Turning this off lets restricted apps run at any time. You will be asked for a reason, and the change is recorded in the activity log." />
+                            </StackPanel>
+                            <ToggleSwitch x:Name="EnforcementToggle" Grid.Column="1" MinWidth="0" IsOn="{x:Bind ViewModel.EnforcementEnabled, Mode=TwoWay}" Toggled="OnEnforcementToggled" AutomationProperties.Name="Enforce restrictions" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- General -->
+                <Border Style="{StaticResource CardStyle}">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="General" AutomationProperties.HeadingLevel="Level2" />
+                        <Grid Style="{StaticResource SettingRowStyle}" BorderThickness="0">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="Start with Windows" />
+                                <TextBlock Style="{StaticResource SecondaryTextStyle}" Text="Start the background agent when you sign in. Tracking and enforcement only run while the agent runs." />
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1" MinWidth="0" IsOn="{x:Bind ViewModel.StartWithWindows, Mode=TwoWay}" AutomationProperties.Name="Start with Windows" />
+                        </Grid>
+                        <Grid Style="{StaticResource SettingRowStyle}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="Minimize to tray" />
+                                <TextBlock Style="{StaticResource SecondaryTextStyle}" Text="Closing this window hides it; reopen it from the tray icon. Tracking continues either way." />
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1" MinWidth="0" IsOn="{x:Bind ViewModel.MinimizeToTray, Mode=TwoWay}" AutomationProperties.Name="Minimize to tray" />
+                        </Grid>
+                        <Grid Style="{StaticResource SettingRowStyle}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="Notifications" />
+                                <TextBlock Style="{StaticResource SecondaryTextStyle}" Text="Reward earned, reward ending soon, and blocked-app notifications." />
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1" MinWidth="0" IsOn="{x:Bind ViewModel.NotificationsEnabled, Mode=TwoWay}" AutomationProperties.Name="Notifications" />
+                        </Grid>
+                        <Grid Style="{StaticResource SettingRowStyle}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <TextBlock VerticalAlignment="Center" Text="Theme" />
+                            <ComboBox Grid.Column="1" Width="220" SelectedIndex="{x:Bind ViewModel.ThemeIndex, Mode=TwoWay}" AutomationProperties.Name="Theme">
+                                <ComboBoxItem Content="Use system setting" />
+                                <ComboBoxItem Content="Light" />
+                                <ComboBoxItem Content="Dark" />
+                            </ComboBox>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- Data -->
+                <Border Style="{StaticResource CardStyle}">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="Data and privacy" AutomationProperties.HeadingLevel="Level2" />
+                        <TextBlock Style="{StaticResource SecondaryTextStyle}" Text="Work to Unlock records which approved app was in the foreground and for how long. It never records keystrokes, window titles, document names or screenshots, and nothing leaves this PC." Margin="0,0,0,8" />
+                        <Grid Style="{StaticResource SettingRowStyle}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="Data retention" />
+                                <TextBlock Style="{StaticResource SecondaryTextStyle}" Text="Days of activity history and log entries to keep (7–3650)." />
+                            </StackPanel>
+                            <NumberBox Grid.Column="1" Style="{StaticResource SettingNumberStyle}" Minimum="7" Maximum="3650" LargeChange="30" Value="{x:Bind ViewModel.DataRetentionDays, Mode=TwoWay}" AutomationProperties.Name="Data retention in days" />
+                        </Grid>
+                        <Grid Style="{StaticResource SettingRowStyle}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="Export local data" />
+                                <TextBlock Style="{StaticResource SecondaryTextStyle}" Text="Save rules, settings, work sessions, rewards and the activity log as JSON." />
+                            </StackPanel>
+                            <Button Grid.Column="1" Content="Export…" Command="{x:Bind ViewModel.ExportCommand}" />
+                        </Grid>
+                        <Grid Style="{StaticResource SettingRowStyle}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="Reset progress" />
+                                <TextBlock Style="{StaticResource SecondaryTextStyle}" Text="Set accumulated work back to zero and cancel any ready or active reward." />
+                            </StackPanel>
+                            <Button Grid.Column="1" Content="Reset…" Command="{x:Bind ViewModel.ResetProgressCommand}" />
+                        </Grid>
+                        <Expander Margin="0,12,0,0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Header="Activity log">
+                            <ItemsControl ItemsSource="{x:Bind ViewModel.AuditEvents}" IsTabStop="False">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:AuditEventViewModel">
+                                        <Grid Padding="0,6" ColumnSpacing="12">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="150" />
+                                                <ColumnDefinition Width="170" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Style="{StaticResource SecondaryTextStyle}" Text="{x:Bind When}" />
+                                            <TextBlock Grid.Column="1" Style="{StaticResource CaptionTextBlockStyle}" Text="{x:Bind EventType}" />
+                                            <TextBlock Grid.Column="2" Style="{StaticResource CaptionTextBlockStyle}" Text="{x:Bind Description}" TextWrapping="Wrap" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Expander>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource CardStyle}">
+                    <StackPanel Spacing="4">
+                        <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="About" AutomationProperties.HeadingLevel="Level2" />
+                        <TextBlock Style="{StaticResource SecondaryTextStyle}">
+                            <Run Text="Work to Unlock " /><Run Text="{x:Bind ViewModel.Version}" />
+                        </TextBlock>
+                        <TextBlock Style="{StaticResource SecondaryTextStyle}" IsTextSelectionEnabled="True">
+                            <Run Text="Data folder: " /><Run Text="{x:Bind ViewModel.DataLocation}" />
+                        </TextBlock>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Save bar -->
+        <Border Grid.Row="1" Padding="36,12" Background="{ThemeResource LayerFillColorDefaultBrush}" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,1,0,0" Visibility="{x:Bind ViewModel.HasChanges, Mode=OneWay}">
+            <StackPanel HorizontalAlignment="Right" Orientation="Horizontal" Spacing="8">
+                <TextBlock VerticalAlignment="Center" Margin="0,0,8,0" Style="{StaticResource SecondaryTextStyle}" Text="You have unsaved changes." />
+                <Button Content="Revert" Command="{x:Bind ViewModel.RevertCommand}" />
+                <Button Content="Save" Style="{StaticResource AccentButtonStyle}" Command="{x:Bind ViewModel.SaveCommand}" />
+            </StackPanel>
+        </Border>
+    </Grid>
+</Page>

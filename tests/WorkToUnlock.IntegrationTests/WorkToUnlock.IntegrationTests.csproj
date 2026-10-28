@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Native Windows integration tests. Every test is a [WindowsFact]: on other platforms they are reported as skipped,
+       never as passed. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+    <Using Include="WorkToUnlock.Testing" />
+    <Compile Include="..\Shared\**\*.cs" LinkBase="Shared" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\WorkToUnlock.Core\WorkToUnlock.Core.csproj" />
+    <ProjectReference Include="..\..\src\WorkToUnlock.Infrastructure\WorkToUnlock.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\WorkToUnlock.Enforcement\WorkToUnlock.Enforcement.csproj" />
+    <!-- Built alongside so the tests can launch them; not referenced as assemblies. -->
+    <ProjectReference Include="..\..\src\WorkToUnlock.Agent\WorkToUnlock.Agent.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\WorkToUnlock.TestTarget\WorkToUnlock.TestTarget.csproj" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+</Project>

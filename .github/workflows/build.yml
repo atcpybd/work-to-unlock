@@ -1,0 +1,74 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  portable:
+    name: Core logic and persistence (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Restore
+        run: dotnet restore WorkToUnlock.Portable.slnf
+      - name: Build
+        run: dotnet build WorkToUnlock.Portable.slnf -c Release --no-restore
+      - name: Unit tests
+        run: >
+          dotnet test WorkToUnlock.Portable.slnf -c Release --no-build
+          --logger "trx;LogFilePrefix=linux" --results-directory TestResults
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-linux
+          path: TestResults
+
+  windows:
+    name: Windows build, native tests and packaging
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Restore
+        run: dotnet restore WorkToUnlock.sln
+      - name: Build (including the WinUI dashboard)
+        run: dotnet build WorkToUnlock.sln -c Release --no-restore
+      - name: Unit tests
+        run: >
+          dotnet test tests/WorkToUnlock.Core.Tests tests/WorkToUnlock.Agent.Tests -c Release --no-build
+          --logger "trx;LogFilePrefix=windows-unit" --results-directory TestResults
+      - name: Windows integration tests
+        # Launches a harmless test target and an isolated agent instance; never touches real applications.
+        run: >
+          dotnet test tests/WorkToUnlock.IntegrationTests -c Release --no-build
+          --logger "trx;LogFilePrefix=windows-integration" --results-directory TestResults
+      - name: Publish and build installer
+        shell: pwsh
+        run: ./build/Publish.ps1 -Version 1.0.${{ github.run_number }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-windows
+          path: TestResults
+      - uses: actions/upload-artifact@v4
+        with:
+          name: work-to-unlock-win-x64
+          path: |
+            artifacts/installer/*.msi
+            artifacts/*.zip
+          if-no-files-found: error

@@ -1,0 +1,16 @@
+{
+  "solution": {
+    "path": "WorkToUnlock.sln",
+    "projects": [
+      "src\\WorkToUnlock.Core\\WorkToUnlock.Core.csproj",
+      "src\\WorkToUnlock.Infrastructure\\WorkToUnlock.Infrastructure.csproj",
+      "src\\WorkToUnlock.Enforcement\\WorkToUnlock.Enforcement.csproj",
+      "src\\WorkToUnlock.Agent\\WorkToUnlock.Agent.csproj",
+      "src\\WorkToUnlock.Service\\WorkToUnlock.Service.csproj",
+      "tests\\WorkToUnlock.Core.Tests\\WorkToUnlock.Core.Tests.csproj",
+      "tests\\WorkToUnlock.Agent.Tests\\WorkToUnlock.Agent.Tests.csproj",
+      "tests\\WorkToUnlock.IntegrationTests\\WorkToUnlock.IntegrationTests.csproj",
+      "tests\\WorkToUnlock.TestTarget\\WorkToUnlock.TestTarget.csproj"
+    ]
+  }
+}
