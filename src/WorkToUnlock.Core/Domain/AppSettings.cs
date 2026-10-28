@@ -17,6 +17,19 @@ public enum EnforcementMode
     Strict = 2,
 }
 
+/// <summary>How work turns into break time.</summary>
+public enum RewardMode
+{
+    /// <summary>Reach the work requirement to earn one break of the reward duration.</summary>
+    Goal = 0,
+
+    /// <summary>
+    /// Earn as you go: every minute of work adds break time at the work/break ratio to a balance (up to a cap)
+    /// that can be spent at any time and stopped early to keep the rest.
+    /// </summary>
+    Balance = 1,
+}
+
 public enum ThemePreference
 {
     System = 0,
@@ -53,6 +66,26 @@ public sealed record AppSettings
     /// </summary>
     public bool EnforcementEnabled { get; init; } = true;
 
+    /// <summary>Minutes of qualifying work per day that count towards the daily goal and streak (0 turns it off).</summary>
+    public int DailyGoalMinutes { get; init; } = 120;
+
+    /// <summary>Stop a running break's countdown while the PC is locked or asleep.</summary>
+    public bool PauseBreakWhileLocked { get; init; }
+
+    public RewardMode RewardMode { get; init; } = RewardMode.Goal;
+
+    /// <summary>Balance mode: the most break time that can be saved up.</summary>
+    public int BalanceCapMinutes { get; init; } = 60;
+
+    /// <summary>Check the project's public releases for a newer version (the only network access the app makes).</summary>
+    public bool CheckForUpdates { get; init; } = true;
+
+    [JsonIgnore]
+    public TimeSpan DailyGoal => TimeSpan.FromMinutes(DailyGoalMinutes);
+
+    [JsonIgnore]
+    public TimeSpan BalanceCap => TimeSpan.FromMinutes(BalanceCapMinutes);
+
     [JsonIgnore]
     public TimeSpan WorkRequirement => TimeSpan.FromMinutes(WorkRequirementMinutes);
 
@@ -83,6 +116,9 @@ public static class SettingsValidator
     public const int MaxGraceSeconds = 300;
     public const int MinRetentionDays = 7;
     public const int MaxRetentionDays = 3650;
+    public const int MaxDailyGoalMinutes = 1440;
+    public const int MinBalanceCapMinutes = 5;
+    public const int MaxBalanceCapMinutes = 480;
 
     public static IReadOnlyList<ValidationError> Validate(AppSettings settings)
     {
@@ -94,6 +130,13 @@ public static class SettingsValidator
         Range(errors, nameof(AppSettings.IdleThresholdSeconds), settings.IdleThresholdSeconds, MinIdleSeconds, MaxIdleSeconds, "Idle threshold", "seconds");
         Range(errors, nameof(AppSettings.GracefulCloseTimeoutSeconds), settings.GracefulCloseTimeoutSeconds, MinGraceSeconds, MaxGraceSeconds, "Graceful-close timeout", "seconds");
         Range(errors, nameof(AppSettings.DataRetentionDays), settings.DataRetentionDays, MinRetentionDays, MaxRetentionDays, "Data retention", "days");
+        Range(errors, nameof(AppSettings.DailyGoalMinutes), settings.DailyGoalMinutes, 0, MaxDailyGoalMinutes, "Daily goal", "minutes");
+        Range(errors, nameof(AppSettings.BalanceCapMinutes), settings.BalanceCapMinutes, MinBalanceCapMinutes, MaxBalanceCapMinutes, "Break balance limit", "minutes");
+
+        if (!Enum.IsDefined(settings.RewardMode))
+        {
+            errors.Add(new(nameof(AppSettings.RewardMode), "Unknown reward mode."));
+        }
 
         if (!Enum.IsDefined(settings.EnforcementMode))
         {

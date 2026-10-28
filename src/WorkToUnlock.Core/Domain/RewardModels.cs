@@ -40,6 +40,17 @@ public sealed record RewardStateRecord
     /// <summary>Optimistic-concurrency version. Incremented on every save.</summary>
     public long Version { get; init; }
 
+    /// <summary>Balance mode: saved break time not currently being used.</summary>
+    public long BalanceMilliseconds { get; init; }
+
+    /// <summary>
+    /// Set while a running break is paused (PC locked or asleep): the break time that was left. On resume the break
+    /// gets exactly this much again, so changing the clock while paused cannot lengthen it.
+    /// </summary>
+    public long? PausedRemainingMilliseconds { get; init; }
+
+    public DateTimeOffset? PausedUtc { get; init; }
+
     public static RewardStateRecord Initial { get; } = new();
 }
 
@@ -49,6 +60,12 @@ public enum RewardTransitionKind
     Activated,
     Expired,
     Reset,
+
+    /// <summary>Balance mode: the user stopped a break early; the rest went back to the balance.</summary>
+    EndedEarly,
+    Paused,
+    Resumed,
+    ModeChanged,
 }
 
 /// <summary>A state transition, recorded atomically with the new state (audit + reward history).</summary>
@@ -73,9 +90,27 @@ public sealed record RewardStatus
 
     public TimeSpan RemainingReward { get; init; }
 
+    public RewardMode Mode { get; init; } = RewardMode.Goal;
+
+    /// <summary>Balance mode: saved break time available to spend.</summary>
+    public TimeSpan Balance { get; init; }
+
+    public TimeSpan BalanceCap { get; init; }
+
+    /// <summary>A running break whose countdown is stopped because the PC is locked or asleep.</summary>
+    public bool IsPaused { get; init; }
+
+    /// <summary>Smallest balance that can be spent.</summary>
+    public static TimeSpan MinimumBalanceToSpend { get; } = TimeSpan.FromMinutes(1);
+
     public TimeSpan RemainingWork => RequiredWork > AccumulatedWork ? RequiredWork - AccumulatedWork : TimeSpan.Zero;
 
-    public bool CanActivate => State == RewardState.RewardReady;
+    public bool CanActivate => Mode == RewardMode.Balance
+        ? State == RewardState.Working && Balance >= MinimumBalanceToSpend
+        : State == RewardState.RewardReady;
+
+    /// <summary>Balance mode only: a running break can be stopped and its remaining time kept.</summary>
+    public bool CanEndEarly => Mode == RewardMode.Balance && State == RewardState.Unlocked;
 
     /// <summary>Restricted apps are available only while a reward is active.</summary>
     public bool RestrictionsActive => State != RewardState.Unlocked;

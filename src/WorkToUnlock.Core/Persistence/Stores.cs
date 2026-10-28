@@ -77,7 +77,45 @@ public interface IAuditLog
 
 public sealed record ApplicationTime(long RuleId, string Name, TimeSpan Time);
 
-public sealed record DailyActivity(DateOnly Date, TimeSpan QualifyingWork);
+public sealed record ApplicationCount(long RuleId, string Name, int Count);
+
+public sealed record DailyActivity(DateOnly Date, TimeSpan QualifyingWork, int BlockedAttempts = 0);
+
+/// <summary>Records each attempt to start a restricted app while it was locked.</summary>
+public interface IBlockedAttemptStore
+{
+    Task RecordAsync(long ruleId, DateTimeOffset timestampUtc, CancellationToken cancellationToken);
+}
+
+public interface IAchievementStore
+{
+    Task<IReadOnlyDictionary<string, DateTimeOffset>> GetUnlockedAsync(CancellationToken cancellationToken);
+
+    /// <summary>Stores the achievement if it is not stored yet. Returns true when it was newly unlocked.</summary>
+    Task<bool> UnlockAsync(string id, DateTimeOffset unlockedUtc, CancellationToken cancellationToken);
+}
+
+public static class DowntimeKinds
+{
+    /// <summary>The agent ended without closing normally (Task Manager, crash, power loss).</summary>
+    public const string AgentNotRunning = "AgentNotRunning";
+
+    /// <summary>The user turned enforcement off.</summary>
+    public const string EnforcementDisabled = "EnforcementDisabled";
+}
+
+public sealed record DowntimePeriod(string Kind, DateTimeOffset StartUtc, DateTimeOffset? EndUtc);
+
+/// <summary>Periods when restrictions were not protecting the user, for the tamper report.</summary>
+public interface IDowntimeStore
+{
+    Task AddAsync(string kind, DateTimeOffset startUtc, DateTimeOffset? endUtc, CancellationToken cancellationToken);
+
+    /// <summary>Closes the open period of this kind, if any.</summary>
+    Task CloseOpenAsync(string kind, DateTimeOffset endUtc, CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<DowntimePeriod>> GetSinceAsync(DateTimeOffset sinceUtc, CancellationToken cancellationToken);
+}
 
 public sealed record StatisticsReport
 {
@@ -96,11 +134,18 @@ public sealed record StatisticsReport
     public IReadOnlyList<ApplicationTime> WorkByApplicationThisWeek { get; init; } = [];
 
     public IReadOnlyList<DailyActivity> DailyHistory { get; init; } = [];
+
+    public int BlockedToday { get; init; }
+
+    public IReadOnlyList<ApplicationCount> BlockedTodayByApplication { get; init; } = [];
 }
 
 public interface IStatisticsStore
 {
     Task<StatisticsReport> GetReportAsync(DateTimeOffset now, TimeZoneInfo timeZone, int historyDays, CancellationToken cancellationToken);
+
+    /// <summary>Qualifying work and blocked attempts per local day, oldest first, ending today.</summary>
+    Task<IReadOnlyList<DailyActivity>> GetDailyTotalsAsync(DateTimeOffset now, TimeZoneInfo timeZone, int days, CancellationToken cancellationToken);
 
     /// <summary>Deletes activity data older than the cutoff. Returns the number of rows removed.</summary>
     Task<int> PruneAsync(DateTimeOffset cutoffUtc, CancellationToken cancellationToken);

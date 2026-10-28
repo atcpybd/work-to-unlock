@@ -85,6 +85,9 @@ internal sealed class AgentHarness : IDisposable
     {
         public Task<StatisticsReport> GetReportAsync(DateTimeOffset now, TimeZoneInfo timeZone, int historyDays, CancellationToken cancellationToken) => Task.FromResult(new StatisticsReport());
 
+        public Task<IReadOnlyList<DailyActivity>> GetDailyTotalsAsync(DateTimeOffset now, TimeZoneInfo timeZone, int days, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<DailyActivity>>([]);
+
         public Task<int> PruneAsync(DateTimeOffset cutoffUtc, CancellationToken cancellationToken) => Task.FromResult(0);
 
         public Task<string> ExportJsonAsync(CancellationToken cancellationToken) => Task.FromResult("{}");

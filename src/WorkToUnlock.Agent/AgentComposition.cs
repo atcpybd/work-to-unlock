@@ -38,6 +38,9 @@ internal static class AgentComposition
         services.AddSingleton<ISettingsStore, SqliteSettingsStore>();
         services.AddSingleton<IAuditLog, SqliteAuditLog>();
         services.AddSingleton<IStatisticsStore, SqliteStatisticsStore>();
+        services.AddSingleton<IBlockedAttemptStore, SqliteBlockedAttemptStore>();
+        services.AddSingleton<IAchievementStore, SqliteAchievementStore>();
+        services.AddSingleton<IDowntimeStore, SqliteDowntimeStore>();
 
         // Domain
         services.AddSingleton<IRuleCatalog, RuleCatalog>();
@@ -63,7 +66,9 @@ internal static class AgentComposition
         // Agent services
         services.AddSingleton<SettingsService>();
         services.AddSingleton<NotificationService>();
-        services.AddSingleton<IEnforcementNotifier>(sp => sp.GetRequiredService<NotificationService>());
+        services.AddSingleton<BlockedAttemptRecorder>();
+        services.AddSingleton<IEnforcementNotifier>(sp => new CompositeEnforcementNotifier(
+            [sp.GetRequiredService<NotificationService>(), sp.GetRequiredService<BlockedAttemptRecorder>()]));
         services.AddSingleton<AgentStatusService>();
         services.AddSingleton<AgentEventHub>();
         services.AddSingleton<IAgentEventHub>(sp => sp.GetRequiredService<AgentEventHub>());

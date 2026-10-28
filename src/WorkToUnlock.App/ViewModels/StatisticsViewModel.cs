@@ -35,8 +35,9 @@ public sealed partial class StatisticsViewModel : ObservableObject
     private readonly MetricViewModel _week = new("This week") { Detail = "Qualifying work" };
     private readonly MetricViewModel _earned = new("Rewards earned");
     private readonly MetricViewModel _rewardTime = new("Reward time activated") { Detail = "Total unlocked time granted" };
+    private readonly MetricViewModel _blocked = new("Blocked today");
 
-    public IReadOnlyList<MetricViewModel> Metrics => [_today, _week, _earned, _rewardTime];
+    public IReadOnlyList<MetricViewModel> Metrics => [_today, _week, _blocked, _earned, _rewardTime];
 
     [ObservableProperty]
     public partial string TodayText { get; set; } = "–";
@@ -97,6 +98,10 @@ public sealed partial class StatisticsViewModel : ObservableObject
         _earned.Value = RewardsEarnedText;
         _earned.Detail = RewardsActivatedText;
         _rewardTime.Value = RewardMinutesText;
+        _blocked.Value = report.BlockedToday == 1 ? "1 attempt" : $"{report.BlockedToday} attempts";
+        _blocked.Detail = report.BlockedToday == 0
+            ? "No locked apps opened today"
+            : string.Join(" · ", report.BlockedTodayByApplication.Select(a => $"{a.Name} {a.Count}"));
 
         Applications.Clear();
         var max = report.WorkByApplicationThisWeek.Select(a => a.Time.TotalMinutes).DefaultIfEmpty(0).Max();
@@ -116,14 +121,17 @@ public sealed partial class StatisticsViewModel : ObservableObject
                 day.Date.ToString("ddd", CultureInfo.CurrentCulture)[..Math.Min(2, day.Date.ToString("ddd", CultureInfo.CurrentCulture).Length)],
                 day.Date.ToString("d", CultureInfo.CurrentCulture),
                 Format.Duration(day.QualifyingWork),
-                height));
+                height,
+                day.BlockedAttempts));
         }
     }
 }
 
 public sealed record ApplicationBarViewModel(string Name, string TimeText, double Percent);
 
-public sealed record DayBarViewModel(string Label, string DateText, string TimeText, double BarHeight)
+public sealed record DayBarViewModel(string Label, string DateText, string TimeText, double BarHeight, int BlockedAttempts)
 {
-    public string ToolTip => $"{DateText}: {TimeText}";
+    public string ToolTip => BlockedAttempts == 0
+        ? $"{DateText}: {TimeText}"
+        : $"{DateText}: {TimeText}, {BlockedAttempts} blocked {(BlockedAttempts == 1 ? "attempt" : "attempts")}";
 }

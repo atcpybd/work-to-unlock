@@ -25,37 +25,14 @@ public sealed class SqliteStatisticsStore(SqliteDatabase database) : IStatistics
         var weekStartUtc = StartOfDayUtc(weekStart, timeZone);
 
         await using var connection = await database.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
-
-        // Sessions are attributed to the local day on which they started.
-        var sessions = new List<(long RuleId, string Name, DateTimeOffset Start, long Ms)>();
-        await using (var command = connection.CreateCommand())
-        {
-            command.CommandText = """
-                SELECT s.ApplicationRuleId, COALESCE(r.Name, '(removed app)'), s.StartUtc, s.QualifyingMilliseconds
-                FROM WorkSessions s LEFT JOIN ApplicationRules r ON r.Id = s.ApplicationRuleId
-                WHERE s.StartUtc >= $from;
-                """;
-            command.Parameters.AddWithValue("$from", Db.ToUnix(StartOfDayUtc(rangeStart, timeZone)));
-            await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
-            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
-            {
-                sessions.Add((reader.GetInt64(0), reader.GetString(1), Db.FromUnix(reader.GetInt64(2)), reader.GetInt64(3)));
-            }
-        }
+        var fromUtc = StartOfDayUtc(rangeStart, timeZone);
+        var sessions = await LoadSessionsAsync(connection, fromUtc, cancellationToken).ConfigureAwait(false);
+        var blocked = await LoadBlockedAsync(connection, fromUtc, cancellationToken).ConfigureAwait(false);
 
         var todaySessions = sessions.Where(s => s.Start >= todayStartUtc).ToList();
         var weekSessions = sessions.Where(s => s.Start >= weekStartUtc).ToList();
-
-        var history = Enumerable.Range(0, historyDays)
-            .Select(i => historyStart.AddDays(i))
-            .Select(day =>
-            {
-                var start = StartOfDayUtc(day, timeZone);
-                var end = StartOfDayUtc(day.AddDays(1), timeZone);
-                var ms = sessions.Where(s => s.Start >= start && s.Start < end).Sum(s => s.Ms);
-                return new DailyActivity(day, TimeSpan.FromMilliseconds(ms));
-            })
-            .ToList();
+        var blockedToday = blocked.Where(b => b.When >= todayStartUtc).ToList();
+        var history = Bucket(historyStart, historyDays, timeZone, sessions, blocked);
 
         int earned, activated;
         long activatedMs;
@@ -82,8 +59,85 @@ public sealed class SqliteStatisticsStore(SqliteDatabase database) : IStatistics
             WorkByApplicationToday = ByApplication(todaySessions),
             WorkByApplicationThisWeek = ByApplication(weekSessions),
             DailyHistory = history,
+            BlockedToday = blockedToday.Count,
+            BlockedTodayByApplication = blockedToday
+                .GroupBy(b => b.RuleId)
+                .Select(g => new ApplicationCount(g.Key, g.First().Name, g.Count()))
+                .OrderByDescending(c => c.Count)
+                .ToList(),
         };
     }
+
+    public async Task<IReadOnlyList<DailyActivity>> GetDailyTotalsAsync(DateTimeOffset now, TimeZoneInfo timeZone, int days, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(timeZone);
+        days = Math.Clamp(days, 1, 3660);
+        var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(now, timeZone).DateTime);
+        var firstDay = today.AddDays(-(days - 1));
+        var fromUtc = StartOfDayUtc(firstDay, timeZone);
+
+        await using var connection = await database.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        var sessions = await LoadSessionsAsync(connection, fromUtc, cancellationToken).ConfigureAwait(false);
+        var blocked = await LoadBlockedAsync(connection, fromUtc, cancellationToken).ConfigureAwait(false);
+        return Bucket(firstDay, days, timeZone, sessions, blocked);
+    }
+
+    /// <summary>Work sessions starting at or after <paramref name="fromUtc"/>, attributed to the local day they started.</summary>
+    private static async Task<List<(long RuleId, string Name, DateTimeOffset Start, long Ms)>> LoadSessionsAsync(SqliteConnection connection, DateTimeOffset fromUtc, CancellationToken cancellationToken)
+    {
+        var sessions = new List<(long RuleId, string Name, DateTimeOffset Start, long Ms)>();
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT s.ApplicationRuleId, COALESCE(r.Name, '(removed app)'), s.StartUtc, s.QualifyingMilliseconds
+            FROM WorkSessions s LEFT JOIN ApplicationRules r ON r.Id = s.ApplicationRuleId
+            WHERE s.StartUtc >= $from;
+            """;
+        command.Parameters.AddWithValue("$from", Db.ToUnix(fromUtc));
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            sessions.Add((reader.GetInt64(0), reader.GetString(1), Db.FromUnix(reader.GetInt64(2)), reader.GetInt64(3)));
+        }
+
+        return sessions;
+    }
+
+    private static async Task<List<(long RuleId, string Name, DateTimeOffset When)>> LoadBlockedAsync(SqliteConnection connection, DateTimeOffset fromUtc, CancellationToken cancellationToken)
+    {
+        var attempts = new List<(long RuleId, string Name, DateTimeOffset When)>();
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT b.ApplicationRuleId, COALESCE(r.Name, '(removed app)'), b.TimestampUtc
+            FROM BlockedAttempts b LEFT JOIN ApplicationRules r ON r.Id = b.ApplicationRuleId
+            WHERE b.TimestampUtc >= $from;
+            """;
+        command.Parameters.AddWithValue("$from", Db.ToUnix(fromUtc));
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            attempts.Add((reader.GetInt64(0), reader.GetString(1), Db.FromUnix(reader.GetInt64(2))));
+        }
+
+        return attempts;
+    }
+
+    private static List<DailyActivity> Bucket(
+        DateOnly firstDay,
+        int days,
+        TimeZoneInfo timeZone,
+        List<(long RuleId, string Name, DateTimeOffset Start, long Ms)> sessions,
+        List<(long RuleId, string Name, DateTimeOffset When)> blocked) =>
+        Enumerable.Range(0, days)
+            .Select(i => firstDay.AddDays(i))
+            .Select(day =>
+            {
+                var start = StartOfDayUtc(day, timeZone);
+                var end = StartOfDayUtc(day.AddDays(1), timeZone);
+                var ms = sessions.Where(s => s.Start >= start && s.Start < end).Sum(s => s.Ms);
+                var attempts = blocked.Count(b => b.When >= start && b.When < end);
+                return new DailyActivity(day, TimeSpan.FromMilliseconds(ms), attempts);
+            })
+            .ToList();
 
     public async Task<int> PruneAsync(DateTimeOffset cutoffUtc, CancellationToken cancellationToken)
     {
@@ -95,6 +149,8 @@ public sealed class SqliteStatisticsStore(SqliteDatabase database) : IStatistics
             DELETE FROM WorkSessions WHERE EndUtc < $cutoff;
             DELETE FROM AuditEvents WHERE TimestampUtc < $cutoff;
             DELETE FROM RewardHistory WHERE EndedUtc IS NOT NULL AND EndedUtc < $cutoff;
+            DELETE FROM BlockedAttempts WHERE TimestampUtc < $cutoff;
+            DELETE FROM Downtime WHERE EndUtc IS NOT NULL AND EndUtc < $cutoff;
             """;
         command.Parameters.AddWithValue("$cutoff", Db.ToUnix(cutoffUtc));
         var removed = await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
@@ -112,7 +168,7 @@ public sealed class SqliteStatisticsStore(SqliteDatabase database) : IStatistics
             writer.WriteString("format", "work-to-unlock-export");
             writer.WriteNumber("schemaVersion", database.SchemaVersion);
             writer.WriteString("exportedUtc", DateTimeOffset.UtcNow);
-            foreach (var table in new[] { "Settings", "ApplicationRules", "RewardState", "RewardHistory", "WorkSessions", "AuditEvents" })
+            foreach (var table in new[] { "Settings", "ApplicationRules", "RewardState", "RewardHistory", "WorkSessions", "BlockedAttempts", "Downtime", "Achievements", "AuditEvents" })
             {
                 await WriteTableAsync(connection, writer, table, cancellationToken).ConfigureAwait(false);
             }

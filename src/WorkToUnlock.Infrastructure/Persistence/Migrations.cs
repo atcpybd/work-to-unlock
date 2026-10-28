@@ -74,6 +74,34 @@ internal static class Migrations
         );
         CREATE INDEX IX_AuditEvents_TimestampUtc ON AuditEvents (TimestampUtc);
         """,
+
+        // 2: blocked launch attempts, achievements, downtime (agent not running / enforcement off),
+        //    break balance and paused breaks.
+        """
+        CREATE TABLE BlockedAttempts (
+            Id INTEGER PRIMARY KEY AUTOINCREMENT,
+            TimestampUtc INTEGER NOT NULL,
+            ApplicationRuleId INTEGER NOT NULL
+        );
+        CREATE INDEX IX_BlockedAttempts_TimestampUtc ON BlockedAttempts (TimestampUtc);
+
+        CREATE TABLE Achievements (
+            Id TEXT PRIMARY KEY NOT NULL,
+            UnlockedUtc INTEGER NOT NULL
+        );
+
+        CREATE TABLE Downtime (
+            Id INTEGER PRIMARY KEY AUTOINCREMENT,
+            Kind TEXT NOT NULL,
+            StartUtc INTEGER NOT NULL,
+            EndUtc INTEGER NULL
+        );
+        CREATE INDEX IX_Downtime_StartUtc ON Downtime (StartUtc);
+
+        ALTER TABLE RewardState ADD COLUMN BalanceMilliseconds INTEGER NOT NULL DEFAULT 0;
+        ALTER TABLE RewardState ADD COLUMN PausedRemainingMilliseconds INTEGER NULL;
+        ALTER TABLE RewardState ADD COLUMN PausedUtc INTEGER NULL;
+        """,
     ];
 
     public static int Latest => Scripts.Length;

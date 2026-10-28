@@ -57,7 +57,7 @@ public sealed class SqlitePersistenceTests : IAsyncLifetime
             }
         }
 
-        Assert.Equal(["ApplicationRules", "AuditEvents", "RewardHistory", "RewardState", "Settings", "WorkSessions"], tables);
+        Assert.Equal(["Achievements", "ApplicationRules", "AuditEvents", "BlockedAttempts", "Downtime", "RewardHistory", "RewardState", "Settings", "WorkSessions"], tables);
     }
 
     [Fact]
@@ -182,6 +182,28 @@ public sealed class SqlitePersistenceTests : IAsyncLifetime
         Assert.Equal(7, report.DailyHistory.Count);
         Assert.Equal(TimeSpan.FromHours(1), report.DailyHistory[^2].QualifyingWork);
         Assert.True(report.WorkThisWeek >= report.WorkToday);
+    }
+
+    [Fact]
+    public async Task Blocked_attempts_are_counted_per_day_and_application()
+    {
+        var rules = new SqliteApplicationRuleStore(_database);
+        var steam = await rules.SaveAsync(TestRules.Restricted(0, "Steam", TestRules.SteamPath), CancellationToken.None);
+        var discord = await rules.SaveAsync(TestRules.Restricted(0, "Discord", TestRules.DiscordPath), CancellationToken.None);
+        var store = new SqliteBlockedAttemptStore(_database);
+        var now = new DateTimeOffset(2026, 3, 4, 15, 0, 0, TimeSpan.Zero);
+        await store.RecordAsync(steam.Id, now.AddHours(-1), CancellationToken.None);
+        await store.RecordAsync(steam.Id, now.AddMinutes(-5), CancellationToken.None);
+        await store.RecordAsync(discord.Id, now.AddMinutes(-1), CancellationToken.None);
+        await store.RecordAsync(steam.Id, now.AddDays(-1), CancellationToken.None);
+        var statistics = new SqliteStatisticsStore(_database);
+
+        var report = await statistics.GetReportAsync(now, TimeZoneInfo.Utc, 7, CancellationToken.None);
+        var days = await statistics.GetDailyTotalsAsync(now, TimeZoneInfo.Utc, 2, CancellationToken.None);
+
+        Assert.Equal(3, report.BlockedToday);
+        Assert.Equal(("Steam", 2), (report.BlockedTodayByApplication[0].Name, report.BlockedTodayByApplication[0].Count));
+        Assert.Equal([1, 3], days.Select(d => d.BlockedAttempts));
     }
 
     [Fact]

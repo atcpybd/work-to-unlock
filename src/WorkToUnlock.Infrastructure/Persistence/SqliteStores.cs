@@ -59,7 +59,8 @@ public sealed class SqliteRewardStateStore(SqliteDatabase database) : IRewardSta
         await using var command = connection.CreateCommand();
         command.CommandText = """
             SELECT State, AccumulatedWorkMilliseconds, RewardEarnedUtc, RewardActivatedUtc, RewardExpiresUtc,
-                   RewardDurationMilliseconds, DeadlineMonotonicMilliseconds, BootId, Version
+                   RewardDurationMilliseconds, DeadlineMonotonicMilliseconds, BootId, Version,
+                   BalanceMilliseconds, PausedRemainingMilliseconds, PausedUtc
             FROM RewardState WHERE Id = 1;
             """;
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
@@ -79,6 +80,9 @@ public sealed class SqliteRewardStateStore(SqliteDatabase database) : IRewardSta
             DeadlineMonotonicMilliseconds = reader.GetNullableInt64(6),
             BootId = reader.GetNullableString(7),
             Version = reader.GetInt64(8),
+            BalanceMilliseconds = reader.GetInt64(9),
+            PausedRemainingMilliseconds = reader.GetNullableInt64(10),
+            PausedUtc = reader.GetNullableTime(11),
         };
     }
 
@@ -99,14 +103,16 @@ public sealed class SqliteRewardStateStore(SqliteDatabase database) : IRewardSta
             update.Transaction = transaction;
             update.CommandText = """
                 INSERT INTO RewardState (Id, State, AccumulatedWorkMilliseconds, RewardEarnedUtc, RewardActivatedUtc, RewardExpiresUtc,
-                                         RewardDurationMilliseconds, DeadlineMonotonicMilliseconds, BootId, Version)
-                SELECT 1, $state, $acc, $earned, $activated, $expires, $duration, $deadline, $boot, $expected
+                                         RewardDurationMilliseconds, DeadlineMonotonicMilliseconds, BootId, Version,
+                                         BalanceMilliseconds, PausedRemainingMilliseconds, PausedUtc)
+                SELECT 1, $state, $acc, $earned, $activated, $expires, $duration, $deadline, $boot, $expected, $balance, $pausedRemaining, $pausedUtc
                 WHERE $expected = 0 AND NOT EXISTS (SELECT 1 FROM RewardState WHERE Id = 1)
                 ON CONFLICT (Id) DO NOTHING;
                 UPDATE RewardState
                 SET State = $state, AccumulatedWorkMilliseconds = $acc, RewardEarnedUtc = $earned, RewardActivatedUtc = $activated,
                     RewardExpiresUtc = $expires, RewardDurationMilliseconds = $duration, DeadlineMonotonicMilliseconds = $deadline,
-                    BootId = $boot, Version = $new
+                    BootId = $boot, Version = $new, BalanceMilliseconds = $balance,
+                    PausedRemainingMilliseconds = $pausedRemaining, PausedUtc = $pausedUtc
                 WHERE Id = 1 AND Version = $expected;
                 SELECT changes();
                 """;
@@ -118,6 +124,9 @@ public sealed class SqliteRewardStateStore(SqliteDatabase database) : IRewardSta
             update.Parameters.AddWithValue("$duration", Db.ToDb(saved.RewardDurationMilliseconds));
             update.Parameters.AddWithValue("$deadline", Db.ToDb(saved.DeadlineMonotonicMilliseconds));
             update.Parameters.AddWithValue("$boot", Db.ToDb(saved.BootId));
+            update.Parameters.AddWithValue("$balance", saved.BalanceMilliseconds);
+            update.Parameters.AddWithValue("$pausedRemaining", Db.ToDb(saved.PausedRemainingMilliseconds));
+            update.Parameters.AddWithValue("$pausedUtc", Db.ToDb(saved.PausedUtc));
             update.Parameters.AddWithValue("$new", saved.Version);
             update.Parameters.AddWithValue("$expected", expectedVersion);
             var changed = Convert.ToInt64(await update.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false), System.Globalization.CultureInfo.InvariantCulture);
@@ -161,8 +170,13 @@ public sealed class SqliteRewardStateStore(SqliteDatabase database) : IRewardSta
                 command.Parameters.AddWithValue("$earned", Db.ToUnix(record.RewardEarnedUtc ?? transition.TimestampUtc));
                 break;
 
+            case RewardTransitionKind.Paused or RewardTransitionKind.Resumed or RewardTransitionKind.ModeChanged:
+                // Audit only; reward history is unchanged.
+                return;
+
             case RewardTransitionKind.Expired:
             case RewardTransitionKind.Reset:
+            case RewardTransitionKind.EndedEarly:
                 command.CommandText = """
                     UPDATE RewardHistory SET EndedUtc = $t, EndReason = $reason
                     WHERE Id = (SELECT MAX(Id) FROM RewardHistory WHERE EndedUtc IS NULL);
