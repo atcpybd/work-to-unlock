@@ -15,20 +15,37 @@ public sealed partial class DashboardViewModel : ObservableObject
     private readonly AgentConnection _agent;
     private readonly DialogService _dialogs;
     private readonly IconCache _icons;
+    private readonly PresetViewModel _customPreset;
     private IReadOnlyList<ApplicationRule> _rules = [];
+    private AppSettings _settings = AppSettings.Default;
 
     public DashboardViewModel(AgentConnection agent, DialogService dialogs, IconCache icons)
     {
         _agent = agent;
         _dialogs = dialogs;
         _icons = icons;
+        foreach (var preset in SessionPresets.All)
+        {
+            Presets.Add(new PresetViewModel(this, preset));
+        }
+
+        _customPreset = new PresetViewModel(this, null);
+        Presets.Add(_customPreset);
+        RefreshPresets();
+
         agent.StatusChanged += (_, status) => Apply(status);
         agent.RulesChanged += (_, rules) => SetRules(rules);
+        agent.SettingsChanged += (_, settings) =>
+        {
+            _settings = settings;
+            RefreshPresets();
+        };
         agent.ConnectionChanged += async (_, connected) =>
         {
             if (connected)
             {
                 await LoadRulesAsync();
+                await LoadSettingsAsync();
             }
         };
         if (agent.LastStatus is { } last)
@@ -38,6 +55,15 @@ public sealed partial class DashboardViewModel : ObservableObject
     }
 
     public ObservableCollection<RestrictedAppStatusViewModel> RestrictedApps { get; } = [];
+
+    /// <summary>One-click work/break presets plus a "Custom" choice.</summary>
+    public ObservableCollection<PresetViewModel> Presets { get; } = [];
+
+    [ObservableProperty]
+    public partial string PresetSummary { get; set; } = string.Empty;
+
+    /// <summary>Shows the custom work/break dialog. Returns null when cancelled.</summary>
+    public Func<int, int, Task<(int WorkMinutes, int BreakMinutes)?>>? AskCustomTimes { get; set; }
 
     public MetricViewModel ActivityMetric { get; } = new("Current activity");
 
@@ -139,6 +165,96 @@ public sealed partial class DashboardViewModel : ObservableObject
         {
             await _dialogs.ShowMessageAsync("Could not unlock", ex.Message);
         }
+    }
+
+    public async Task LoadSettingsAsync()
+    {
+        try
+        {
+            if (await _agent.RequestAsync<AppSettings>(AgentMethods.GetSettings) is { } settings)
+            {
+                _settings = settings;
+                RefreshPresets();
+            }
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or IOException or Infrastructure.Ipc.IpcException or TimeoutException)
+        {
+        }
+    }
+
+    internal async Task SelectPresetAsync(PresetViewModel item)
+    {
+        if (item.Preset is { } preset)
+        {
+            await ApplyTimesAsync(preset.WorkMinutes, preset.BreakMinutes);
+            return;
+        }
+
+        var custom = AskCustomTimes is null ? null : await AskCustomTimes(_settings.WorkRequirementMinutes, _settings.RewardDurationMinutes);
+        if (custom is { } times)
+        {
+            await ApplyTimesAsync(times.WorkMinutes, times.BreakMinutes);
+        }
+        else
+        {
+            RefreshPresets();
+        }
+    }
+
+    /// <summary>Changes only the work and break times, starting from the agent's latest settings.</summary>
+    private async Task ApplyTimesAsync(int workMinutes, int breakMinutes)
+    {
+        try
+        {
+            var latest = await _agent.RequestAsync<AppSettings>(AgentMethods.GetSettings) ?? _settings;
+            var requested = SessionPresets.Apply(latest, workMinutes, breakMinutes);
+            if (requested == latest)
+            {
+                _settings = latest;
+                return;
+            }
+
+            var errors = SettingsValidator.Validate(requested);
+            if (errors.Count > 0)
+            {
+                await _dialogs.ShowMessageAsync("Times not changed", string.Join(Environment.NewLine, errors.Select(e => e.Message)));
+                return;
+            }
+
+            var result = await _agent.RequestAsync<OperationResult>(AgentMethods.UpdateSettings, requested);
+            if (result is { Succeeded: true })
+            {
+                _settings = requested;
+            }
+            else
+            {
+                await _dialogs.ShowMessageAsync("Times not changed", result?.Message ?? "No response from the agent.");
+            }
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or IOException or Infrastructure.Ipc.IpcException or TimeoutException)
+        {
+            await _dialogs.ShowMessageAsync("Times not changed", ex.Message);
+        }
+        finally
+        {
+            RefreshPresets();
+        }
+    }
+
+    private void RefreshPresets()
+    {
+        var match = SessionPresets.Match(_settings);
+        foreach (var item in Presets)
+        {
+            item.SetSelected(item.IsCustom ? match is null : item.Preset == match);
+        }
+
+        var work = _settings.WorkRequirementMinutes;
+        var rest = _settings.RewardDurationMinutes;
+        _customPreset.Title = match is null ? $"{work} / {rest}" : "Custom";
+        _customPreset.Subtitle = match is null ? "Custom" : "Set your own";
+        PresetSummary = $"{Format.Duration(_settings.WorkRequirement)} of work earns {Format.Duration(_settings.RewardDuration)} of break. "
+            + "Changes apply right away; a break that is already running keeps its length.";
     }
 
     public async Task LoadRulesAsync()
@@ -273,6 +389,52 @@ public sealed partial class DashboardViewModel : ObservableObject
             item.Update(status);
         }
     }
+}
+
+/// <summary>A work/break preset button on the dashboard. A null preset is the "Custom" choice.</summary>
+public sealed partial class PresetViewModel : ObservableObject
+{
+    private readonly DashboardViewModel _owner;
+
+    public PresetViewModel(DashboardViewModel owner, SessionPreset? preset)
+    {
+        _owner = owner;
+        Preset = preset;
+        Title = preset is null ? "Custom" : $"{preset.WorkMinutes} / {preset.BreakMinutes}";
+        Subtitle = preset?.Name ?? "Set your own";
+    }
+
+    public SessionPreset? Preset { get; }
+
+    public bool IsCustom => Preset is null;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(AccessibleName))]
+    public partial string Title { get; set; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(AccessibleName))]
+    public partial string Subtitle { get; set; }
+
+    [ObservableProperty]
+    public partial bool IsSelected { get; set; }
+
+    public string AccessibleName => Preset is { } p
+        ? $"{p.Name}: {p.WorkMinutes} minutes of work, {p.BreakMinutes} minutes of break"
+        : $"Custom work and break times ({Title})";
+
+    /// <summary>
+    /// Sets the selection and always notifies, so a toggle button the user just clicked snaps back to the real state
+    /// even when the value did not change.
+    /// </summary>
+    internal void SetSelected(bool selected)
+    {
+        IsSelected = selected;
+        OnPropertyChanged(nameof(IsSelected));
+    }
+
+    [RelayCommand]
+    private Task SelectAsync() => _owner.SelectPresetAsync(this);
 }
 
 public sealed partial class MetricViewModel(string title) : ObservableObject

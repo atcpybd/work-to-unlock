@@ -82,6 +82,37 @@
                 </Grid>
             </Border>
 
+            <!-- Work / break presets -->
+            <Border Style="{StaticResource CardStyle}">
+                <StackPanel Spacing="12">
+                    <StackPanel Spacing="2">
+                        <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="Work and break" AutomationProperties.HeadingLevel="Level2" />
+                        <TextBlock Style="{StaticResource SecondaryTextStyle}" Text="{x:Bind ViewModel.PresetSummary, Mode=OneWay}" />
+                    </StackPanel>
+                    <ItemsRepeater ItemsSource="{x:Bind ViewModel.Presets}">
+                        <ItemsRepeater.Layout>
+                            <UniformGridLayout MinItemWidth="132" MinItemHeight="60" MinColumnSpacing="8" MinRowSpacing="8" ItemsStretch="Fill" />
+                        </ItemsRepeater.Layout>
+                        <ItemsRepeater.ItemTemplate>
+                            <DataTemplate x:DataType="vm:PresetViewModel">
+                                <ToggleButton
+                                    HorizontalAlignment="Stretch"
+                                    VerticalAlignment="Stretch"
+                                    HorizontalContentAlignment="Center"
+                                    AutomationProperties.Name="{x:Bind AccessibleName, Mode=OneWay}"
+                                    Command="{x:Bind SelectCommand}"
+                                    IsChecked="{x:Bind IsSelected, Mode=OneWay}">
+                                    <StackPanel Spacing="1">
+                                        <TextBlock HorizontalAlignment="Center" Style="{StaticResource BodyStrongTextBlockStyle}" Text="{x:Bind Title, Mode=OneWay}" />
+                                        <TextBlock HorizontalAlignment="Center" Style="{StaticResource CaptionTextBlockStyle}" Text="{x:Bind Subtitle, Mode=OneWay}" />
+                                    </StackPanel>
+                                </ToggleButton>
+                            </DataTemplate>
+                        </ItemsRepeater.ItemTemplate>
+                    </ItemsRepeater>
+                </StackPanel>
+            </Border>
+
             <!-- Metrics: equal-width cards that reflow from four columns to two or one. -->
             <ItemsRepeater ItemsSource="{x:Bind ViewModel.Metrics}" ItemTemplate="{StaticResource MetricCardTemplate}">
                 <ItemsRepeater.Layout>
