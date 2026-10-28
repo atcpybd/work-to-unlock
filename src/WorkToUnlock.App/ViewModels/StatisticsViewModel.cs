@@ -37,6 +37,11 @@ public sealed partial class StatisticsViewModel : ObservableObject
 
     private const int MaxIncidents = 6;
 
+    public ObservableCollection<AchievementViewModel> Achievements { get; } = [];
+
+    [ObservableProperty]
+    public partial string AchievementsSummary { get; set; } = string.Empty;
+
     private readonly MetricViewModel _today = new("Today") { Detail = "Qualifying work" };
     private readonly MetricViewModel _week = new("This week") { Detail = "Qualifying work" };
     private readonly MetricViewModel _earned = new("Rewards earned");
@@ -99,11 +104,13 @@ public sealed partial class StatisticsViewModel : ObservableObject
         StatisticsReport? report;
         DailyProgress? progress;
         TamperReport? honesty;
+        List<AchievementInfo>? achievements;
         try
         {
             report = await agent.RequestAsync<StatisticsReport>(AgentMethods.GetStatistics);
             progress = await agent.RequestAsync<DailyProgress>(AgentMethods.GetDailyProgress);
             honesty = await agent.RequestAsync<TamperReport>(AgentMethods.GetTamperReport);
+            achievements = await agent.RequestAsync<List<AchievementInfo>>(AgentMethods.GetAchievements);
             ErrorText = null;
         }
         catch (Exception ex) when (ex is InvalidOperationException or IOException or Infrastructure.Ipc.IpcException or TimeoutException)
@@ -164,6 +171,22 @@ public sealed partial class StatisticsViewModel : ObservableObject
         {
             ApplyHonesty(honesty);
         }
+
+        if (achievements is not null)
+        {
+            Achievements.Clear();
+            foreach (var achievement in achievements)
+            {
+                Achievements.Add(new AchievementViewModel(
+                    achievement.Title,
+                    achievement.Description,
+                    achievement.Glyph,
+                    achievement.UnlockedUtc is not null,
+                    achievement.UnlockedUtc is { } when ? $"Unlocked {when.ToLocalTime().ToString("d MMM yyyy", CultureInfo.CurrentCulture)}" : "Locked"));
+            }
+
+            AchievementsSummary = $"{achievements.Count(a => a.UnlockedUtc is not null)} of {achievements.Count} unlocked";
+        }
     }
 
     private void ApplyHonesty(TamperReport report)
@@ -196,6 +219,15 @@ public sealed partial class StatisticsViewModel : ObservableObject
 }
 
 public sealed record IncidentViewModel(string WhenText, string KindText, string DurationText);
+
+public sealed record AchievementViewModel(string Title, string Description, string Glyph, bool Unlocked, string StatusText)
+{
+    public bool Locked => !Unlocked;
+
+    public double Opacity => Unlocked ? 1 : 0.55;
+
+    public string ToolTip => $"{Title}: {Description}. {StatusText}";
+}
 
 public sealed record ApplicationBarViewModel(string Name, string TimeText, double Percent);
 

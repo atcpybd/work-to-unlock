@@ -52,6 +52,8 @@ public static class AgentMethods
     public const string GetDailyProgress = "getDailyProgress";
 
     public const string GetTamperReport = "getTamperReport";
+
+    public const string GetAchievements = "getAchievements";
 }
 
 /// <summary>Events pushed by the agent to subscribed dashboards.</summary>

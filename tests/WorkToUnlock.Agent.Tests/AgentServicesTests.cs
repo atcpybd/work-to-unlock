@@ -53,7 +53,12 @@ internal sealed class AgentHarness : IDisposable
         Coordinator = new EnforcementCoordinator(Enforcer, Strict, Engine, Rules, Settings, NullLogger<EnforcementCoordinator>.Instance);
         Notifications = new NotificationService(Tray, Settings, Engine, Clock);
         Protection = new ProtectionMonitor(SettingsStore, Downtime, Settings, Audit, Clock, NullLogger<ProtectionMonitor>.Instance);
+        Progress = new ProgressService(Statistics, Settings, Notifications, Clock, NullLogger<ProgressService>.Instance) { TimeZone = TimeZoneInfo.Utc };
     }
+
+    public ProgressService Progress { get; }
+
+    public InMemoryAchievementStore Achievements { get; } = new();
 
     public InMemoryDowntimeStore Downtime { get; } = new();
 
@@ -74,8 +79,8 @@ internal sealed class AgentHarness : IDisposable
         var info = new AgentInfo();
         var status = new AgentStatusService(Engine, tracker, Coordinator, Settings, info, Clock);
         var bridge = new DashboardBridge(hub ?? new AgentEventHub(), info, NullLogger<DashboardBridge>.Instance);
-        var progress = new ProgressService(Statistics, Settings, Notifications, Clock, NullLogger<ProgressService>.Instance);
-        return new AgentRequestHandler(status, Engine, Rules, Settings, Discovery, Statistics, Audit, Strict, bridge, progress, Protection, TestRules.Folders, Clock, NullLogger<AgentRequestHandler>.Instance);
+        var achievements = new AchievementService(Achievements, Statistics, Progress, Protection, Notifications, Clock, NullLogger<AchievementService>.Instance);
+        return new AgentRequestHandler(status, Engine, Rules, Settings, Discovery, Statistics, Audit, Strict, bridge, Progress, Protection, achievements, TestRules.Folders, Clock, NullLogger<AgentRequestHandler>.Instance);
     }
 
     /// <summary>Waits for event-triggered reconciliations (they run on the thread pool).</summary>
@@ -94,7 +99,9 @@ internal sealed class AgentHarness : IDisposable
         /// <summary>Daily totals returned to callers, oldest first, ending today.</summary>
         public List<DailyActivity> Days { get; set; } = [];
 
-        public Task<StatisticsReport> GetReportAsync(DateTimeOffset now, TimeZoneInfo timeZone, int historyDays, CancellationToken cancellationToken) => Task.FromResult(new StatisticsReport());
+        public StatisticsReport Report { get; set; } = new();
+
+        public Task<StatisticsReport> GetReportAsync(DateTimeOffset now, TimeZoneInfo timeZone, int historyDays, CancellationToken cancellationToken) => Task.FromResult(Report);
 
         public Task<IReadOnlyList<DailyActivity>> GetDailyTotalsAsync(DateTimeOffset now, TimeZoneInfo timeZone, int days, CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<DailyActivity>>(Days.ToList());

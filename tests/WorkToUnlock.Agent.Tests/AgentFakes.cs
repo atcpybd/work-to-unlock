@@ -200,6 +200,15 @@ internal sealed class InMemoryDowntimeStore : IDowntimeStore
         }
     }
 }
+internal sealed class InMemoryAchievementStore : IAchievementStore
+{
+    public ConcurrentDictionary<string, DateTimeOffset> Unlocked { get; } = new(StringComparer.Ordinal);
+
+    public Task<IReadOnlyDictionary<string, DateTimeOffset>> GetUnlockedAsync(CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyDictionary<string, DateTimeOffset>>(new Dictionary<string, DateTimeOffset>(Unlocked, StringComparer.Ordinal));
+
+    public Task<bool> UnlockAsync(string id, DateTimeOffset unlockedUtc, CancellationToken cancellationToken) => Task.FromResult(Unlocked.TryAdd(id, unlockedUtc));
+}
 internal sealed class FakeDiscovery : IApplicationDiscovery
 {
     public Func<string, RuleType, ExecutableInspection> OnInspect { get; set; } = (path, _) => new ExecutableInspection

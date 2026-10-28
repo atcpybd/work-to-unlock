@@ -148,6 +148,7 @@ public sealed class AgentService(IServiceProvider services, ILogger<AgentService
         coordinator.HealthChanged += (_, _) => _ = PublishStatusAsync();
         await coordinator.StartAsync(cancellationToken).ConfigureAwait(false);
         services.GetRequiredService<NotificationService>().Start();
+        services.GetRequiredService<AchievementService>().Start();
 
         // 4. Startup registration and IPC.
         platform.ApplyStartupRegistration(settings.Current.StartWithWindows);

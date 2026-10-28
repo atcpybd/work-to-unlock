@@ -68,6 +68,39 @@
 
             <Border Style="{StaticResource CardStyle}">
                 <StackPanel Spacing="8">
+                    <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="Achievements" AutomationProperties.HeadingLevel="Level2" Margin="0" />
+                    <TextBlock Style="{StaticResource SecondaryTextStyle}" Text="{x:Bind ViewModel.AchievementsSummary, Mode=OneWay}" />
+                    <ItemsRepeater ItemsSource="{x:Bind ViewModel.Achievements}" Margin="0,4,0,0">
+                        <ItemsRepeater.Layout>
+                            <UniformGridLayout MinItemWidth="240" MinItemHeight="104" MinColumnSpacing="8" MinRowSpacing="8" ItemsStretch="Fill" />
+                        </ItemsRepeater.Layout>
+                        <ItemsRepeater.ItemTemplate>
+                            <DataTemplate x:DataType="vm:AchievementViewModel">
+                                <Grid Padding="12" ColumnSpacing="12" CornerRadius="8" Background="{ThemeResource SubtleFillColorSecondaryBrush}" Opacity="{x:Bind Opacity}"
+                                      ToolTipService.ToolTip="{x:Bind ToolTip}" AutomationProperties.Name="{x:Bind ToolTip}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Grid Width="40" Height="40" VerticalAlignment="Top">
+                                        <Ellipse Fill="{ThemeResource AccentFillColorDefaultBrush}" Visibility="{x:Bind Unlocked}" />
+                                        <Ellipse Fill="{ThemeResource ControlStrongFillColorDisabledBrush}" Visibility="{x:Bind Locked}" />
+                                        <FontIcon FontSize="18" Glyph="{x:Bind Glyph}" Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}" />
+                                    </Grid>
+                                    <StackPanel Grid.Column="1" Spacing="2">
+                                        <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{x:Bind Title}" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Style="{StaticResource SecondaryTextStyle}" Text="{x:Bind Description}" TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorTertiaryBrush}" Text="{x:Bind StatusText}" />
+                                    </StackPanel>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsRepeater.ItemTemplate>
+                    </ItemsRepeater>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource CardStyle}">
+                <StackPanel Spacing="8">
                     <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="Honesty report" AutomationProperties.HeadingLevel="Level2" Margin="0" />
                     <TextBlock Style="{StaticResource SecondaryTextStyle}" Text="Times when locked apps were not being blocked: Work to Unlock closed or ended from Task Manager, or enforcement turned off. Signing out and shutting down don't count." TextWrapping="Wrap" />
                     <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,4,0,0">

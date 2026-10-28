@@ -55,6 +55,18 @@ public sealed class NotificationService(ITrayPresenter tray, SettingsService set
         Show($"goal:{clock.UtcNow:yyyyMMdd}", TimeSpan.Zero, "Daily goal reached!", $"{Format(progress.Goal)} of focused work today. {streak}");
     }
 
+    public void NotifyAchievementsUnlocked(IReadOnlyList<AchievementDefinition> achievements)
+    {
+        if (achievements.Count == 1)
+        {
+            Show($"achievement:{achievements[0].Id}", TimeSpan.Zero, $"Achievement unlocked: {achievements[0].Title}", achievements[0].Description);
+        }
+        else if (achievements.Count > 1)
+        {
+            Show("achievements", TimeSpan.Zero, $"{achievements.Count} achievements unlocked", string.Join(", ", achievements.Select(a => a.Title)));
+        }
+    }
+
     /// <summary>Called by the main loop: warns before an active reward ends.</summary>
     public void CheckRewardCountdown(RewardStatus status)
     {
