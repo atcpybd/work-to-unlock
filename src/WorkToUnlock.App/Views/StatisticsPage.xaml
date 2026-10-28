@@ -32,7 +32,7 @@
                             <StackPanel Spacing="2">
                                 <TextBlock Style="{StaticResource SecondaryTextStyle}" Text="{x:Bind Title}" />
                                 <TextBlock Style="{StaticResource MetricValueStyle}" Text="{x:Bind Value, Mode=OneWay}" />
-                                <TextBlock Style="{StaticResource SecondaryTextStyle}" Text="{x:Bind Detail, Mode=OneWay}" />
+                                <TextBlock Style="{StaticResource SecondaryTextStyle}" Text="{x:Bind Detail, Mode=OneWay}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" ToolTipService.ToolTip="{x:Bind Detail, Mode=OneWay}" />
                             </StackPanel>
                         </Border>
                     </DataTemplate>
@@ -59,6 +59,37 @@
                                     <Rectangle Width="26" Height="{x:Bind BarHeight}" VerticalAlignment="Bottom" RadiusX="4" RadiusY="4" Fill="{ThemeResource AccentFillColorDefaultBrush}" Visibility="{x:Bind GoalMet}" />
                                     <Rectangle Width="26" Height="{x:Bind BarHeight}" VerticalAlignment="Bottom" RadiusX="4" RadiusY="4" Fill="{ThemeResource ControlStrongFillColorDisabledBrush}" Visibility="{x:Bind GoalMissed}" />
                                     <TextBlock Grid.Row="1" Margin="0,6,0,0" HorizontalAlignment="Center" Style="{StaticResource SecondaryTextStyle}" Text="{x:Bind Label}" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource CardStyle}">
+                <StackPanel Spacing="8">
+                    <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="Honesty report" AutomationProperties.HeadingLevel="Level2" Margin="0" />
+                    <TextBlock Style="{StaticResource SecondaryTextStyle}" Text="Times when locked apps were not being blocked: Work to Unlock closed or ended from Task Manager, or enforcement turned off. Signing out and shutting down don't count." TextWrapping="Wrap" />
+                    <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,4,0,0">
+                        <FontIcon FontSize="20" Glyph="&#xE73E;" Foreground="{ThemeResource SystemFillColorSuccessBrush}" Visibility="{x:Bind ViewModel.HonestyIsClean, Mode=OneWay}" />
+                        <FontIcon FontSize="20" Glyph="&#xE7BA;" Foreground="{ThemeResource SystemFillColorCautionBrush}" Visibility="{x:Bind ViewModel.HonestyHasIssues, Mode=OneWay}" />
+                        <TextBlock VerticalAlignment="Center" Style="{StaticResource BodyStrongTextBlockStyle}" Text="{x:Bind ViewModel.HonestyHeadline, Mode=OneWay}" />
+                    </StackPanel>
+                    <TextBlock Text="{x:Bind ViewModel.AgentStopsText, Mode=OneWay}" TextWrapping="Wrap" />
+                    <TextBlock Text="{x:Bind ViewModel.EnforcementOffText, Mode=OneWay}" TextWrapping="Wrap" />
+                    <InfoBar IsOpen="{x:Bind ViewModel.EnforcementOffNow, Mode=OneWay}" IsClosable="False" Severity="Warning" Message="Enforcement is off right now. Turn it back on in Settings." />
+                    <ItemsControl ItemsSource="{x:Bind ViewModel.Incidents}" IsTabStop="False" Visibility="{x:Bind ViewModel.HonestyHasIssues, Mode=OneWay}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:IncidentViewModel">
+                                <Grid Padding="0,4" ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="200" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="110" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Style="{StaticResource SecondaryTextStyle}" Text="{x:Bind WhenText}" />
+                                    <TextBlock Grid.Column="1" Text="{x:Bind KindText}" />
+                                    <TextBlock Grid.Column="2" HorizontalAlignment="Right" Text="{x:Bind DurationText}" />
                                 </Grid>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>

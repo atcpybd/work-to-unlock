@@ -10,6 +10,7 @@ internal sealed class WindowsPlatformIntegration(
     AgentWindow window,
     WindowsSessionStateProvider session,
     TrayController tray,
+    ProtectionMonitor protection,
     IHostApplicationLifetime lifetime,
     ILogger<WindowsPlatformIntegration> logger) : IPlatformIntegration, IDisposable
 {
@@ -26,9 +27,10 @@ internal sealed class WindowsPlatformIntegration(
         window.Start();
         session.Attach(window);
         tray.Initialize();
-        window.CloseRequested += () =>
+        window.CloseRequested += sessionEnding =>
         {
-            logger.LogInformation("Windows asked the agent to close (sign-out, shutdown or installer)");
+            logger.LogInformation(sessionEnding ? "Windows is ending the session (sign-out, shutdown or installer)" : "Another program asked the agent to close");
+            protection.MarkExiting(sessionEnding ? ProtectionMonitor.ExitSessionEnding : ProtectionMonitor.ExitClosed);
             lifetime.StopApplication();
         };
         CrashRecovery.Register(logger);

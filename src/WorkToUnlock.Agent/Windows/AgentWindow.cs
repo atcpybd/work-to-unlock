@@ -48,7 +48,8 @@ internal sealed unsafe partial class AgentWindow : IDisposable
     public event Action<uint, int, int>? TrayMessage;
 
     /// <summary>Windows is shutting down / signing out, or an installer asked the agent to close.</summary>
-    public event Action? CloseRequested;
+    /// <summary>Raised when the agent should close. True when Windows is ending the session (sign-out, shutdown, installer).</summary>
+    public event Action<bool>? CloseRequested;
 
     public void Start()
     {
@@ -196,13 +197,13 @@ internal sealed unsafe partial class AgentWindow : IDisposable
             case WM_ENDSESSION:
                 if (wParam != 0)
                 {
-                    CloseRequested?.Invoke();
+                    CloseRequested?.Invoke(true);
                 }
 
                 return true;
 
             case WM_CLOSE:
-                CloseRequested?.Invoke();
+                CloseRequested?.Invoke(false);
                 return true;
 
             default:

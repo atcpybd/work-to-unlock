@@ -55,6 +55,7 @@ public sealed class AgentService(IServiceProvider services, ILogger<AgentService
         try
         {
             await services.GetRequiredService<IWorkTracker>().FlushAsync(CancellationToken.None).ConfigureAwait(false);
+            await services.GetRequiredService<ProtectionMonitor>().StopAsync(CancellationToken.None).ConfigureAwait(false);
             await services.GetRequiredService<IAuditLog>().WriteAsync("AgentStopped", "The agent stopped.", "Success", CancellationToken.None).ConfigureAwait(false);
         }
         catch (Exception ex)
@@ -112,6 +113,7 @@ public sealed class AgentService(IServiceProvider services, ILogger<AgentService
         // 2. Settings, rules and reward state.
         var settings = services.GetRequiredService<SettingsService>();
         await settings.LoadAsync(cancellationToken).ConfigureAwait(false);
+        await services.GetRequiredService<ProtectionMonitor>().StartAsync(cancellationToken).ConfigureAwait(false);
         var rules = services.GetRequiredService<IRuleCatalog>();
         await rules.LoadAsync(cancellationToken).ConfigureAwait(false);
         await services.GetRequiredService<DefaultRulesSeeder>().SeedIfFirstRunAsync(cancellationToken).ConfigureAwait(false);
@@ -170,9 +172,11 @@ public sealed class AgentService(IServiceProvider services, ILogger<AgentService
         var maintenance = services.GetRequiredService<MaintenanceService>();
 
         var progress = services.GetRequiredService<ProgressService>();
+        var protection = services.GetRequiredService<ProtectionMonitor>();
         var statusCadence = new Cadence(StatusInterval);
         var maintenanceCadence = new Cadence(MaintenanceInterval);
         var progressCadence = new Cadence(ProgressInterval);
+        var heartbeatCadence = new Cadence(ProtectionMonitor.HeartbeatInterval);
         using var timer = new PeriodicTimer(SampleInterval);
         do
         {
@@ -209,6 +213,21 @@ public sealed class AgentService(IServiceProvider services, ILogger<AgentService
                     catch (Exception ex) when (ex is not OperationCanceledException)
                     {
                         logger.LogWarning(ex, "Daily progress check failed");
+                    }
+                }, cancellationToken);
+            }
+
+            if (heartbeatCadence.IsDue(now))
+            {
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await protection.BeatAsync(cancellationToken).ConfigureAwait(false);
+                    }
+                    catch (Exception ex) when (ex is not OperationCanceledException)
+                    {
+                        logger.LogWarning(ex, "Heartbeat failed");
                     }
                 }, cancellationToken);
             }

@@ -24,6 +24,7 @@ public sealed class AgentRequestHandler(
     IStrictEnforcementClient strictClient,
     DashboardBridge dashboards,
     ProgressService progress,
+    ProtectionMonitor protection,
     SystemFolders folders,
     IClock clock,
     ILogger<AgentRequestHandler> logger) : IIpcRequestHandler
@@ -87,6 +88,9 @@ public sealed class AgentRequestHandler(
 
             case AgentMethods.GetDailyProgress:
                 return await progress.GetAsync(cancellationToken).ConfigureAwait(false);
+
+            case AgentMethods.GetTamperReport:
+                return await protection.GetReportAsync(cancellationToken).ConfigureAwait(false);
 
             case AgentMethods.GetRuleTimes:
                 return await GetRuleTimesAsync(cancellationToken).ConfigureAwait(false);

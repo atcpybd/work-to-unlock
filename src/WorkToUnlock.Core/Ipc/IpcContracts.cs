@@ -50,6 +50,8 @@ public static class AgentMethods
     public const string ShowDashboard = "showDashboard";
     public const string ExitDashboards = "exitDashboards";
     public const string GetDailyProgress = "getDailyProgress";
+
+    public const string GetTamperReport = "getTamperReport";
 }
 
 /// <summary>Events pushed by the agent to subscribed dashboards.</summary>

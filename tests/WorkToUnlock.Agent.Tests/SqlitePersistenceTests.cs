@@ -207,6 +207,23 @@ public sealed class SqlitePersistenceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Downtime_periods_open_close_and_are_listed_since_a_time()
+    {
+        var store = new SqliteDowntimeStore(_database);
+        var now = new DateTimeOffset(2026, 3, 4, 15, 0, 0, TimeSpan.Zero);
+        await store.AddAsync(DowntimeKinds.AgentNotRunning, now.AddDays(-20), now.AddDays(-20).AddHours(1), CancellationToken.None);
+        await store.AddAsync(DowntimeKinds.AgentNotRunning, now.AddHours(-3), now.AddHours(-2), CancellationToken.None);
+        await store.AddAsync(DowntimeKinds.EnforcementDisabled, now.AddHours(-1), null, CancellationToken.None);
+
+        Assert.Equal(2, (await store.GetSinceAsync(now.AddDays(-7), CancellationToken.None)).Count);
+        await store.CloseOpenAsync(DowntimeKinds.EnforcementDisabled, now, CancellationToken.None);
+
+        var periods = await store.GetSinceAsync(now.AddDays(-7), CancellationToken.None);
+        Assert.Equal(now, periods.Single(p => p.Kind == DowntimeKinds.EnforcementDisabled).EndUtc);
+        Assert.Empty(await store.GetSinceAsync(now.AddMinutes(1), CancellationToken.None));
+    }
+
+    [Fact]
     public async Task Pruning_removes_old_activity_only()
     {
         var sessions = new SqliteWorkSessionStore(_database);

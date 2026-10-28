@@ -52,7 +52,12 @@ internal sealed class AgentHarness : IDisposable
         Settings = new SettingsService(SettingsStore, Audit, NullLogger<SettingsService>.Instance);
         Coordinator = new EnforcementCoordinator(Enforcer, Strict, Engine, Rules, Settings, NullLogger<EnforcementCoordinator>.Instance);
         Notifications = new NotificationService(Tray, Settings, Engine, Clock);
+        Protection = new ProtectionMonitor(SettingsStore, Downtime, Settings, Audit, Clock, NullLogger<ProtectionMonitor>.Instance);
     }
+
+    public InMemoryDowntimeStore Downtime { get; } = new();
+
+    public ProtectionMonitor Protection { get; }
 
     public async Task StartAsync()
     {
@@ -70,7 +75,7 @@ internal sealed class AgentHarness : IDisposable
         var status = new AgentStatusService(Engine, tracker, Coordinator, Settings, info, Clock);
         var bridge = new DashboardBridge(hub ?? new AgentEventHub(), info, NullLogger<DashboardBridge>.Instance);
         var progress = new ProgressService(Statistics, Settings, Notifications, Clock, NullLogger<ProgressService>.Instance);
-        return new AgentRequestHandler(status, Engine, Rules, Settings, Discovery, Statistics, Audit, Strict, bridge, progress, TestRules.Folders, Clock, NullLogger<AgentRequestHandler>.Instance);
+        return new AgentRequestHandler(status, Engine, Rules, Settings, Discovery, Statistics, Audit, Strict, bridge, progress, Protection, TestRules.Folders, Clock, NullLogger<AgentRequestHandler>.Instance);
     }
 
     /// <summary>Waits for event-triggered reconciliations (they run on the thread pool).</summary>

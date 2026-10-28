@@ -162,6 +162,44 @@ internal sealed class InMemoryAuditLog : IAuditLog
         Task.FromResult<IReadOnlyList<AuditEvent>>(Events.AsEnumerable().Reverse().Take(count).ToList());
 }
 
+internal sealed class InMemoryDowntimeStore : IDowntimeStore
+{
+    public List<DowntimePeriod> Periods { get; } = [];
+
+    public Task AddAsync(string kind, DateTimeOffset startUtc, DateTimeOffset? endUtc, CancellationToken cancellationToken)
+    {
+        lock (Periods)
+        {
+            Periods.Add(new DowntimePeriod(kind, startUtc, endUtc));
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public Task CloseOpenAsync(string kind, DateTimeOffset endUtc, CancellationToken cancellationToken)
+    {
+        lock (Periods)
+        {
+            for (var i = 0; i < Periods.Count; i++)
+            {
+                if (Periods[i].Kind == kind && Periods[i].EndUtc is null)
+                {
+                    Periods[i] = Periods[i] with { EndUtc = endUtc };
+                }
+            }
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public Task<IReadOnlyList<DowntimePeriod>> GetSinceAsync(DateTimeOffset sinceUtc, CancellationToken cancellationToken)
+    {
+        lock (Periods)
+        {
+            return Task.FromResult<IReadOnlyList<DowntimePeriod>>(Periods.Where(p => p.EndUtc is null || p.EndUtc >= sinceUtc).ToList());
+        }
+    }
+}
 internal sealed class FakeDiscovery : IApplicationDiscovery
 {
     public Func<string, RuleType, ExecutableInspection> OnInspect { get; set; } = (path, _) => new ExecutableInspection

@@ -32,6 +32,11 @@ public sealed partial class StatisticsViewModel : ObservableObject
 
     public ObservableCollection<DayBarViewModel> Days { get; } = [];
 
+    /// <summary>Newest first, at most <see cref="MaxIncidents"/>.</summary>
+    public ObservableCollection<IncidentViewModel> Incidents { get; } = [];
+
+    private const int MaxIncidents = 6;
+
     private readonly MetricViewModel _today = new("Today") { Detail = "Qualifying work" };
     private readonly MetricViewModel _week = new("This week") { Detail = "Qualifying work" };
     private readonly MetricViewModel _earned = new("Rewards earned");
@@ -60,6 +65,24 @@ public sealed partial class StatisticsViewModel : ObservableObject
     public partial bool HasNoApplications { get; set; }
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HonestyHasIssues))]
+    public partial bool HonestyIsClean { get; set; } = true;
+
+    public bool HonestyHasIssues => !HonestyIsClean;
+
+    [ObservableProperty]
+    public partial string HonestyHeadline { get; set; } = "–";
+
+    [ObservableProperty]
+    public partial string AgentStopsText { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial string EnforcementOffText { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial bool EnforcementOffNow { get; set; }
+
+    [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasError))]
     public partial string? ErrorText { get; set; }
 
@@ -75,10 +98,12 @@ public sealed partial class StatisticsViewModel : ObservableObject
 
         StatisticsReport? report;
         DailyProgress? progress;
+        TamperReport? honesty;
         try
         {
             report = await agent.RequestAsync<StatisticsReport>(AgentMethods.GetStatistics);
             progress = await agent.RequestAsync<DailyProgress>(AgentMethods.GetDailyProgress);
+            honesty = await agent.RequestAsync<TamperReport>(AgentMethods.GetTamperReport);
             ErrorText = null;
         }
         catch (Exception ex) when (ex is InvalidOperationException or IOException or Infrastructure.Ipc.IpcException or TimeoutException)
@@ -109,7 +134,7 @@ public sealed partial class StatisticsViewModel : ObservableObject
             : "Set a daily goal in Settings to build a streak";
         _blocked.Value = report.BlockedToday == 1 ? "1 attempt" : $"{report.BlockedToday} attempts";
         _blocked.Detail = report.BlockedToday == 0
-            ? "No locked apps opened today"
+            ? "Nothing blocked today"
             : string.Join(" · ", report.BlockedTodayByApplication.Select(a => $"{a.Name} {a.Count}"));
 
         Applications.Clear();
@@ -134,8 +159,43 @@ public sealed partial class StatisticsViewModel : ObservableObject
                 day.BlockedAttempts,
                 goal > TimeSpan.Zero && day.QualifyingWork >= goal));
         }
+
+        if (honesty is not null)
+        {
+            ApplyHonesty(honesty);
+        }
+    }
+
+    private void ApplyHonesty(TamperReport report)
+    {
+        static string Times(int count) => count == 1 ? "once" : $"{count} times";
+
+        HonestyIsClean = report.IsClean;
+        var incidents = report.UnexpectedStops + report.TimesEnforcementDisabled;
+        HonestyHeadline = report.IsClean
+            ? $"Protected for the last {report.Days} days"
+            : $"Unprotected {Times(incidents)} in the last {report.Days} days";
+        AgentStopsText = report.UnexpectedStops == 0
+            ? "Work to Unlock kept running"
+            : $"Work to Unlock was closed or ended {Times(report.UnexpectedStops)} · {Format.Duration(report.TimeNotRunning)} not running";
+        EnforcementOffText = report.TimesEnforcementDisabled == 0
+            ? "Enforcement stayed on"
+            : $"Enforcement turned off {Times(report.TimesEnforcementDisabled)} · {Format.Duration(report.TimeEnforcementDisabled)} in total";
+        EnforcementOffNow = report.EnforcementDisabledNow;
+
+        Incidents.Clear();
+        foreach (var incident in report.Incidents.Take(MaxIncidents))
+        {
+            var local = incident.StartUtc.ToLocalTime();
+            Incidents.Add(new IncidentViewModel(
+                $"{local.ToString("ddd d MMM", CultureInfo.CurrentCulture)}, {local.ToString("t", CultureInfo.CurrentCulture)}",
+                incident.Kind == DowntimeKinds.AgentNotRunning ? "Not running" : "Enforcement off",
+                incident.EndUtc is null ? $"{Format.Duration(incident.Duration)} so far" : Format.Duration(incident.Duration)));
+        }
     }
 }
+
+public sealed record IncidentViewModel(string WhenText, string KindText, string DurationText);
 
 public sealed record ApplicationBarViewModel(string Name, string TimeText, double Percent);
 
