@@ -135,6 +135,33 @@
                         <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="Work and break" AutomationProperties.HeadingLevel="Level2" />
                         <TextBlock Style="{StaticResource SecondaryTextStyle}" Text="{x:Bind ViewModel.PresetSummary, Mode=OneWay}" />
                     </StackPanel>
+                    <StackPanel Spacing="8" Visibility="{x:Bind Profiles.HasProfiles, Mode=OneWay}">
+                        <TextBlock Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="Profiles" />
+                        <ItemsRepeater ItemsSource="{x:Bind Profiles.Items}">
+                            <ItemsRepeater.Layout>
+                                <UniformGridLayout MinItemWidth="200" MinItemHeight="60" MinColumnSpacing="8" MinRowSpacing="8" ItemsStretch="Fill" />
+                            </ItemsRepeater.Layout>
+                            <ItemsRepeater.ItemTemplate>
+                                <DataTemplate x:DataType="vm:ProfileItemViewModel">
+                                    <ToggleButton
+                                        HorizontalAlignment="Stretch"
+                                        VerticalAlignment="Stretch"
+                                        HorizontalContentAlignment="Left"
+                                        Padding="12,6"
+                                        AutomationProperties.Name="{x:Bind AccessibleName}"
+                                        ToolTipService.ToolTip="{x:Bind Summary}"
+                                        Command="{x:Bind UseCommand}"
+                                        IsChecked="{x:Bind IsActive, Mode=OneWay}">
+                                        <StackPanel Spacing="1">
+                                            <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{x:Bind Name}" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Style="{StaticResource CaptionTextBlockStyle}" Text="{x:Bind Summary}" TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+                                    </ToggleButton>
+                                </DataTemplate>
+                            </ItemsRepeater.ItemTemplate>
+                        </ItemsRepeater>
+                        <TextBlock Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="Times" Margin="0,4,0,0" />
+                    </StackPanel>
                     <ItemsRepeater ItemsSource="{x:Bind ViewModel.Presets}">
                         <ItemsRepeater.Layout>
                             <UniformGridLayout MinItemWidth="132" MinItemHeight="60" MinColumnSpacing="8" MinRowSpacing="8" ItemsStretch="Fill" />

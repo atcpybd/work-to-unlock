@@ -26,6 +26,7 @@ public sealed class AgentRequestHandler(
     ProgressService progress,
     ProtectionMonitor protection,
     AchievementService achievements,
+    ProfileService profiles,
     SystemFolders folders,
     IClock clock,
     ILogger<AgentRequestHandler> logger) : IIpcRequestHandler
@@ -53,6 +54,18 @@ public sealed class AgentRequestHandler(
                 return await engine.EndBreakEarlyAsync(cancellationToken).ConfigureAwait(false)
                     ? OperationResult.Ok("Break ended. The time left is saved.")
                     : OperationResult.Fail("There is no break to end.");
+
+            case AgentMethods.ListProfiles:
+                return await profiles.GetAsync(cancellationToken).ConfigureAwait(false);
+
+            case AgentMethods.SaveProfile:
+                return await profiles.SaveCurrentAsync(Required<ProfileRequest>(payload).Name, cancellationToken).ConfigureAwait(false);
+
+            case AgentMethods.DeleteProfile:
+                return await profiles.DeleteAsync(Required<ProfileRequest>(payload).Id ?? string.Empty, cancellationToken).ConfigureAwait(false);
+
+            case AgentMethods.ApplyProfile:
+                return await profiles.ApplyAsync(Required<ProfileRequest>(payload).Id ?? string.Empty, cancellationToken).ConfigureAwait(false);
 
             case AgentMethods.ListRules:
                 return rules.Rules;

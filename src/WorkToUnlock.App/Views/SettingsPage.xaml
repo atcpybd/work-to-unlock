@@ -99,6 +99,46 @@
                     </StackPanel>
                 </Border>
 
+                <!-- Profiles -->
+                <Border Style="{StaticResource CardStyle}">
+                    <StackPanel Spacing="8">
+                        <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="Profiles" AutomationProperties.HeadingLevel="Level2" />
+                        <TextBlock Style="{StaticResource SecondaryTextStyle}" TextWrapping="Wrap"
+                                   Text="Save your setup to switch back to it in one click from the dashboard, for example School and Weekend. A profile keeps the work and break times, how breaks are earned, the daily goal, and which restricted apps are allowed (turned off on the Applications page)." />
+                        <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{x:Bind Profiles.ActiveText, Mode=OneWay}" Visibility="{x:Bind Profiles.HasProfiles, Mode=OneWay}" />
+                        <ItemsControl ItemsSource="{x:Bind Profiles.Items}" IsTabStop="False">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:ProfileItemViewModel">
+                                    <Grid Padding="0,8" ColumnSpacing="12" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="0,1,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="{x:Bind Name}" />
+                                            <TextBlock Style="{StaticResource SecondaryTextStyle}" Text="{x:Bind Summary}" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                        <TextBlock Grid.Column="1" VerticalAlignment="Center" Style="{StaticResource SecondaryTextStyle}" Text="In use" Visibility="{x:Bind IsActive}" />
+                                        <Button Grid.Column="1" VerticalAlignment="Center" Content="Use" Command="{x:Bind UseCommand}" Visibility="{x:Bind IsInactive}" AutomationProperties.Name="{x:Bind AccessibleName}" />
+                                        <Button Grid.Column="2" VerticalAlignment="Center" Command="{x:Bind DeleteCommand}" ToolTipService.ToolTip="Delete profile" AutomationProperties.Name="Delete profile">
+                                            <FontIcon FontSize="14" Glyph="&#xE74D;" />
+                                        </Button>
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <Grid ColumnSpacing="12" Margin="0,4,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBox PlaceholderText="Profile name, for example School" MaxLength="40" Text="{x:Bind Profiles.NewName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Profile name" />
+                            <Button Grid.Column="1" Content="Save current setup" Command="{x:Bind Profiles.SaveCommand}" Style="{StaticResource AccentButtonStyle}" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
                 <!-- Enforcement -->
                 <Border Style="{StaticResource CardStyle}">
                     <StackPanel>

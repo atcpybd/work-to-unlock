@@ -15,6 +15,7 @@ public sealed partial class DashboardPage : Page
     public DashboardPage()
     {
         ViewModel = App.Services.GetRequiredService<DashboardViewModel>();
+        Profiles = App.Services.GetRequiredService<ProfilesViewModel>();
         _dialogs = App.Services.GetRequiredService<DialogService>();
         InitializeComponent();
         ViewModel.AskCustomTimes = AskCustomTimesAsync;
@@ -22,9 +23,12 @@ public sealed partial class DashboardPage : Page
 
     public DashboardViewModel ViewModel { get; }
 
+    public ProfilesViewModel Profiles { get; }
+
     protected override async void OnNavigatedTo(NavigationEventArgs e)
     {
         base.OnNavigatedTo(e);
+        _ = Profiles.LoadAsync();
 
         // Daily totals come from saved sessions, so a slow refresh is enough.
         _progressTimer ??= DispatcherQueue.CreateTimer();

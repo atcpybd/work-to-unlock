@@ -14,6 +14,7 @@ public sealed partial class SettingsPage : Page
     public SettingsPage()
     {
         ViewModel = App.Services.GetRequiredService<SettingsViewModel>();
+        Profiles = App.Services.GetRequiredService<ProfilesViewModel>();
         _dialogs = App.Services.GetRequiredService<DialogService>();
         InitializeComponent();
         ViewModel.AskDisableReason = AskDisableReasonAsync;
@@ -21,9 +22,12 @@ public sealed partial class SettingsPage : Page
 
     public SettingsViewModel ViewModel { get; }
 
+    public ProfilesViewModel Profiles { get; }
+
     protected override async void OnNavigatedTo(NavigationEventArgs e)
     {
         base.OnNavigatedTo(e);
+        _ = Profiles.LoadAsync();
         await ViewModel.LoadAsync();
     }
 

@@ -56,6 +56,15 @@ public static class AgentMethods
     public const string GetAchievements = "getAchievements";
 
     public const string EndBreakEarly = "endBreakEarly";
+
+    public const string ListProfiles = "listProfiles";
+
+    /// <summary>Saves the current setup as a profile (payload: <see cref="ProfileRequest.Name"/>).</summary>
+    public const string SaveProfile = "saveProfile";
+
+    public const string DeleteProfile = "deleteProfile";
+
+    public const string ApplyProfile = "applyProfile";
 }
 
 /// <summary>Events pushed by the agent to subscribed dashboards.</summary>
@@ -141,6 +150,8 @@ public sealed record IdRequest(long Id);
 public sealed record PathRequest(string Path, RuleType RuleType);
 
 public sealed record ResetProgressRequest(string Reason);
+
+public sealed record ProfileRequest(string? Id = null, string? Name = null);
 
 public sealed record SetEnforcementRequest(bool Enabled, string Reason);
 
