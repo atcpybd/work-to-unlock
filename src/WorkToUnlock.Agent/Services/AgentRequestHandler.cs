@@ -49,6 +49,11 @@ public sealed class AgentRequestHandler(
                 logger.LogInformation("Reward activation requested by pid {Pid}: {Outcome}", client.ProcessId, result.Outcome);
                 return result;
 
+            case AgentMethods.EndBreakEarly:
+                return await engine.EndBreakEarlyAsync(cancellationToken).ConfigureAwait(false)
+                    ? OperationResult.Ok("Break ended. The time left is saved.")
+                    : OperationResult.Fail("There is no break to end.");
+
             case AgentMethods.ListRules:
                 return rules.Rules;
 

@@ -31,7 +31,7 @@ internal sealed partial class TrayController(
     private const uint NIN_SELECT = 0x400, NIN_KEYSELECT = 0x401, NIN_BALLOONUSERCLICK = 0x405;
     private const uint MF_STRING = 0, MF_GRAYED = 0x1, MF_SEPARATOR = 0x800;
     private const uint TPM_RIGHTBUTTON = 0x2, TPM_RETURNCMD = 0x100, TPM_NONOTIFY = 0x80;
-    private const int CmdActivate = 10, CmdOpen = 11, CmdSettings = 12, CmdExitDashboard = 13;
+    private const int CmdActivate = 10, CmdOpen = 11, CmdSettings = 12, CmdExitDashboard = 13, CmdEndBreak = 14;
 
     private readonly Dictionary<string, nint> _icons = [];
     private AgentStatus? _status;
@@ -102,6 +102,7 @@ internal sealed partial class TrayController(
             RewardState.RewardReady => $"Reward ready ({NotificationService.Format(reward.RewardDuration)})",
             RewardState.Unlocked when reward.IsPaused => $"Break paused, {NotificationService.Format(reward.RemainingReward)} left",
             RewardState.Unlocked => $"Unlocked, {NotificationService.Format(reward.RemainingReward)} left",
+            _ when reward.Mode == RewardMode.Balance => $"{NotificationService.Format(reward.Balance)} of break time saved",
             _ => $"{(int)reward.AccumulatedWork.TotalMinutes} of {(int)reward.RequiredWork.TotalMinutes} min worked",
         };
     }
@@ -205,7 +206,14 @@ internal sealed partial class TrayController(
                 Append(menu, MF_SEPARATOR, 0, null);
                 if (status.Reward.CanActivate)
                 {
-                    Append(menu, MF_STRING, CmdActivate, $"Unlock apps for {NotificationService.Format(status.Reward.RewardDuration)}");
+                    Append(menu, MF_STRING, CmdActivate, status.Reward.Mode == RewardMode.Balance
+                        ? $"Start a break ({NotificationService.Format(status.Reward.Balance)} saved)"
+                        : $"Unlock apps for {NotificationService.Format(status.Reward.RewardDuration)}");
+                }
+
+                if (status.Reward.CanEndEarly)
+                {
+                    Append(menu, MF_STRING, CmdEndBreak, "End break and save the time left");
                 }
             }
 
@@ -227,6 +235,9 @@ internal sealed partial class TrayController(
                         var result = await engine.ActivateRewardAsync(CancellationToken.None).ConfigureAwait(false);
                         logger.LogInformation("Reward activation from tray: {Outcome}", result.Outcome);
                     });
+                    break;
+                case CmdEndBreak:
+                    Run(() => engine.EndBreakEarlyAsync(CancellationToken.None));
                     break;
                 case CmdOpen:
                     Run(() => dashboards.ShowAsync(null));

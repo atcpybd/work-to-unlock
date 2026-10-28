@@ -54,6 +54,8 @@ public static class AgentMethods
     public const string GetTamperReport = "getTamperReport";
 
     public const string GetAchievements = "getAchievements";
+
+    public const string EndBreakEarly = "endBreakEarly";
 }
 
 /// <summary>Events pushed by the agent to subscribed dashboards.</summary>

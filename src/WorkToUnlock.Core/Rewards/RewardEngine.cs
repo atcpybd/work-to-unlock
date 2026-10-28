@@ -5,10 +5,23 @@ using WorkToUnlock.Core.Time;
 
 namespace WorkToUnlock.Core.Rewards;
 
-/// <summary>Work requirement and reward duration used by the engine.</summary>
-public sealed record RewardSettings(TimeSpan WorkRequirement, TimeSpan RewardDuration)
+/// <summary>
+/// Work requirement and reward duration used by the engine. In <see cref="RewardMode.Balance"/> their ratio is the
+/// break time earned per unit of work, saved up to <see cref="BalanceCap"/>.
+/// </summary>
+public sealed record RewardSettings(TimeSpan WorkRequirement, TimeSpan RewardDuration, RewardMode Mode = RewardMode.Goal, TimeSpan BalanceCap = default)
 {
-    public static RewardSettings From(AppSettings settings) => new(settings.WorkRequirement, settings.RewardDuration);
+    public static RewardSettings From(AppSettings settings) => new(settings.WorkRequirement, settings.RewardDuration, settings.RewardMode, settings.BalanceCap);
+
+    internal long CapMilliseconds => (long)BalanceCap.TotalMilliseconds;
+
+    /// <summary>Break time earned by this much work.</summary>
+    internal long BreakFor(long workMilliseconds) =>
+        (long)Math.Round(workMilliseconds * RewardDuration.TotalMilliseconds / WorkRequirement.TotalMilliseconds);
+
+    /// <summary>Work that earns this much break time.</summary>
+    internal long WorkFor(long breakMilliseconds) =>
+        (long)Math.Round(breakMilliseconds * WorkRequirement.TotalMilliseconds / RewardDuration.TotalMilliseconds);
 }
 
 public interface IRewardEngine
@@ -36,6 +49,9 @@ public interface IRewardEngine
 
     /// <summary>Restarts a paused break with exactly the time that was left. Returns true when it resumed.</summary>
     Task<bool> ResumeAsync(CancellationToken cancellationToken);
+
+    /// <summary>Balance mode: ends the running break and saves the time left. Returns true when a break ended.</summary>
+    Task<bool> EndBreakEarlyAsync(CancellationToken cancellationToken);
 
     Task UpdateSettingsAsync(RewardSettings settings, CancellationToken cancellationToken);
 
@@ -74,11 +90,15 @@ public sealed class RewardEngine(IRewardStateStore store, IClock clock, ILogger<
 
             logger.LogInformation("Reward engine restored state {State} with {Accumulated} accumulated", record.State, TimeSpan.FromMilliseconds(record.AccumulatedWorkMilliseconds));
 
+            // Progress saved under the other mode (the mode changed while the agent was stopping) is converted.
+            await ApplyModeAsync(cancellationToken).ConfigureAwait(false);
+            record = _state.Record;
+
             if (record.State == RewardState.Unlocked && Remaining(_state) <= TimeSpan.Zero)
             {
                 await ExpireAsync("Reward elapsed while the agent was not running", cancellationToken).ConfigureAwait(false);
             }
-            else if (record.State == RewardState.Working && record.AccumulatedWorkMilliseconds >= (long)settings.WorkRequirement.TotalMilliseconds)
+            else if (settings.Mode == RewardMode.Goal && record.State == RewardState.Working && record.AccumulatedWorkMilliseconds >= (long)settings.WorkRequirement.TotalMilliseconds)
             {
                 await EarnAsync(cancellationToken).ConfigureAwait(false);
             }
@@ -110,7 +130,9 @@ public sealed class RewardEngine(IRewardStateStore store, IClock clock, ILogger<
             var pending = state.PendingMilliseconds + (long)qualifyingTime.TotalMilliseconds;
             _state = state with { PendingMilliseconds = pending };
 
-            if (state.Record.AccumulatedWorkMilliseconds + pending >= (long)state.Settings.WorkRequirement.TotalMilliseconds)
+            // Balance mode: work turns into saved break time when it is flushed; there is no target to reach.
+            if (state.Settings.Mode == RewardMode.Goal
+                && state.Record.AccumulatedWorkMilliseconds + pending >= (long)state.Settings.WorkRequirement.TotalMilliseconds)
             {
                 await EarnAsync(cancellationToken).ConfigureAwait(false);
             }
@@ -128,20 +150,28 @@ public sealed class RewardEngine(IRewardStateStore store, IClock clock, ILogger<
         {
             EnsureInitialized();
             var state = _state;
-            switch (state.Record.State)
+            var status = BuildStatus(state);
+            if (state.Record.State == RewardState.Unlocked)
             {
-                case RewardState.Unlocked:
-                    return new ActivationResult(ActivationOutcome.AlreadyActive, BuildStatus(state));
-                case not RewardState.RewardReady:
-                    return new ActivationResult(ActivationOutcome.NotReady, BuildStatus(state));
+                return new ActivationResult(ActivationOutcome.AlreadyActive, status);
             }
 
+            if (!status.CanActivate)
+            {
+                return new ActivationResult(ActivationOutcome.NotReady, status);
+            }
+
+            // Goal mode unlocks the configured duration; balance mode spends everything saved (end early to keep the rest).
+            var balanceMode = state.Settings.Mode == RewardMode.Balance;
+            var durationMs = balanceMode ? (long)status.Balance.TotalMilliseconds : (long)state.Settings.RewardDuration.TotalMilliseconds;
             var now = clock.UtcNow;
             var mono = clock.MonotonicMilliseconds;
-            var durationMs = (long)state.Settings.RewardDuration.TotalMilliseconds;
             var record = state.Record with
             {
                 State = RewardState.Unlocked,
+                AccumulatedWorkMilliseconds = balanceMode ? 0 : state.Record.AccumulatedWorkMilliseconds,
+                BalanceMilliseconds = balanceMode ? 0 : state.Record.BalanceMilliseconds,
+                RewardEarnedUtc = state.Record.RewardEarnedUtc ?? now,
                 RewardActivatedUtc = now,
                 RewardExpiresUtc = now.AddMilliseconds(durationMs),
                 RewardDurationMilliseconds = durationMs,
@@ -152,7 +182,10 @@ public sealed class RewardEngine(IRewardStateStore store, IClock clock, ILogger<
             var saved = await store.SaveAsync(
                 record,
                 state.Record.Version,
-                new RewardTransition(RewardTransitionKind.Activated, now, $"Reward activated for {FormatDuration(state.Settings.RewardDuration)}"),
+                new RewardTransition(
+                    RewardTransitionKind.Activated,
+                    now,
+                    balanceMode ? $"Break started with {FormatDuration(TimeSpan.FromMilliseconds(durationMs))} of saved time" : $"Reward activated for {FormatDuration(state.Settings.RewardDuration)}"),
                 cancellationToken).ConfigureAwait(false);
 
             _state = state with { Record = saved, PendingMilliseconds = 0, DeadlineMonotonic = mono + durationMs };
@@ -197,7 +230,7 @@ public sealed class RewardEngine(IRewardStateStore store, IClock clock, ILogger<
         {
             EnsureInitialized();
             var state = _state;
-            var record = Cleared(state.Record);
+            var record = Cleared(state.Record) with { BalanceMilliseconds = 0 };
             var saved = await store.SaveAsync(
                 record,
                 state.Record.Version,
@@ -290,6 +323,37 @@ public sealed class RewardEngine(IRewardStateStore store, IClock clock, ILogger<
         }
     }
 
+    public async Task<bool> EndBreakEarlyAsync(CancellationToken cancellationToken)
+    {
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            EnsureInitialized();
+            var state = _state;
+            if (state.Settings.Mode != RewardMode.Balance || state.Record.State != RewardState.Unlocked)
+            {
+                return false;
+            }
+
+            var left = (long)Remaining(state).TotalMilliseconds;
+            var balance = Math.Min(state.Settings.CapMilliseconds, state.Record.BalanceMilliseconds + left);
+            var saved = await store.SaveAsync(
+                Cleared(state.Record) with { BalanceMilliseconds = balance },
+                state.Record.Version,
+                new RewardTransition(RewardTransitionKind.EndedEarly, clock.UtcNow, $"Break ended early; {FormatDuration(TimeSpan.FromMilliseconds(left))} saved for later"),
+                cancellationToken).ConfigureAwait(false);
+
+            _state = state with { Record = saved, PendingMilliseconds = 0, DeadlineMonotonic = null };
+            logger.LogInformation("Break ended early with {Left} saved", TimeSpan.FromMilliseconds(left));
+            Publish();
+            return true;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
     public async Task UpdateSettingsAsync(RewardSettings settings, CancellationToken cancellationToken)
     {
         ValidateSettings(settings);
@@ -297,11 +361,13 @@ public sealed class RewardEngine(IRewardStateStore store, IClock clock, ILogger<
         try
         {
             EnsureInitialized();
-            var state = _state with { Settings = settings };
-            _state = state;
+            _state = _state with { Settings = settings };
+            await ApplyModeAsync(cancellationToken).ConfigureAwait(false);
+            var state = _state;
 
             // An active reward keeps the duration captured at activation. A lowered requirement may complete the goal.
-            if (state.Record.State == RewardState.Working
+            if (settings.Mode == RewardMode.Goal
+                && state.Record.State == RewardState.Working
                 && state.Record.AccumulatedWorkMilliseconds + state.PendingMilliseconds >= (long)settings.WorkRequirement.TotalMilliseconds)
             {
                 await EarnAsync(cancellationToken).ConfigureAwait(false);
@@ -328,10 +394,9 @@ public sealed class RewardEngine(IRewardStateStore store, IClock clock, ILogger<
                 return;
             }
 
-            var record = state.Record with
-            {
-                AccumulatedWorkMilliseconds = state.Record.AccumulatedWorkMilliseconds + state.PendingMilliseconds,
-            };
+            var record = state.Settings.Mode == RewardMode.Balance
+                ? state.Record with { BalanceMilliseconds = Balance(state) }
+                : state.Record with { AccumulatedWorkMilliseconds = state.Record.AccumulatedWorkMilliseconds + state.PendingMilliseconds };
             var saved = await store.SaveAsync(record, state.Record.Version, null, cancellationToken).ConfigureAwait(false);
             _state = state with { Record = saved, PendingMilliseconds = 0 };
         }
@@ -379,6 +444,60 @@ public sealed class RewardEngine(IRewardStateStore store, IClock clock, ILogger<
         _state = state with { Record = saved, PendingMilliseconds = 0, DeadlineMonotonic = null };
         logger.LogInformation("Reward expired: {Description}", description);
         Publish();
+    }
+
+    /// <summary>
+    /// Converts progress kept for the other reward mode: switching to balance mode saves earned and partial progress
+    /// as break time; switching to goal mode counts saved break time as work towards the goal. A running break
+    /// continues unchanged. Unsaved work needs no conversion: each mode credits it in its own way when it is saved.
+    /// </summary>
+    private async Task ApplyModeAsync(CancellationToken cancellationToken)
+    {
+        var state = _state;
+        var record = state.Record;
+        var settings = state.Settings;
+        RewardStateRecord converted;
+        string description;
+
+        if (settings.Mode == RewardMode.Balance)
+        {
+            var work = record.AccumulatedWorkMilliseconds;
+            if (record.State == RewardState.Unlocked || (record.State == RewardState.Working && work == 0))
+            {
+                return;
+            }
+
+            var earned = record.State == RewardState.RewardReady ? (long)settings.RewardDuration.TotalMilliseconds : settings.BreakFor(work);
+            converted = record with
+            {
+                State = RewardState.Working,
+                AccumulatedWorkMilliseconds = 0,
+                RewardEarnedUtc = null,
+                BalanceMilliseconds = Math.Min(settings.CapMilliseconds, record.BalanceMilliseconds + earned),
+            };
+            description = $"Switched to earning as you go; {FormatDuration(TimeSpan.FromMilliseconds(earned))} of break time saved";
+        }
+        else
+        {
+            if (record.State != RewardState.Working || record.BalanceMilliseconds == 0)
+            {
+                return;
+            }
+
+            var work = Math.Min(
+                (long)settings.WorkRequirement.TotalMilliseconds,
+                record.AccumulatedWorkMilliseconds + settings.WorkFor(record.BalanceMilliseconds));
+            converted = record with { AccumulatedWorkMilliseconds = work, BalanceMilliseconds = 0 };
+            description = $"Switched to a work goal; saved break time counts as {FormatDuration(TimeSpan.FromMilliseconds(work))} of work";
+        }
+
+        var saved = await store.SaveAsync(
+            converted,
+            record.Version,
+            new RewardTransition(RewardTransitionKind.ModeChanged, clock.UtcNow, description),
+            cancellationToken).ConfigureAwait(false);
+        _state = state with { Record = saved };
+        logger.LogInformation("Reward mode applied: {Description}", description);
     }
 
     private RewardStatus Publish()
@@ -513,6 +632,13 @@ public sealed class RewardEngine(IRewardStateStore store, IClock clock, ILogger<
         return remaining < TimeSpan.Zero ? TimeSpan.Zero : remaining;
     }
 
+    /// <summary>Balance mode: saved break time including work not flushed yet, up to the cap.</summary>
+    private static long Balance(EngineState state)
+    {
+        var pending = state.Record.State == RewardState.Working ? state.Settings.BreakFor(state.PendingMilliseconds) : 0;
+        return Math.Min(state.Settings.CapMilliseconds, state.Record.BalanceMilliseconds + pending);
+    }
+
     private RewardStatus BuildStatus(EngineState state)
     {
         var record = state.Record;
@@ -533,6 +659,9 @@ public sealed class RewardEngine(IRewardStateStore store, IClock clock, ILogger<
             RewardExpiresUtc = record.RewardExpiresUtc,
             RemainingReward = Remaining(state),
             IsPaused = record.State == RewardState.Unlocked && record.PausedRemainingMilliseconds is not null,
+            Mode = state.Settings.Mode,
+            Balance = state.Settings.Mode == RewardMode.Balance ? TimeSpan.FromMilliseconds(Balance(state)) : TimeSpan.Zero,
+            BalanceCap = state.Settings.BalanceCap,
         };
     }
 
@@ -550,6 +679,11 @@ public sealed class RewardEngine(IRewardStateStore store, IClock clock, ILogger<
         if (settings.WorkRequirement <= TimeSpan.Zero || settings.RewardDuration <= TimeSpan.Zero)
         {
             throw new ArgumentOutOfRangeException(nameof(settings), "Work requirement and reward duration must be positive.");
+        }
+
+        if (settings.Mode == RewardMode.Balance && settings.BalanceCap <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(nameof(settings), "Balance mode needs a positive balance limit.");
         }
     }
 

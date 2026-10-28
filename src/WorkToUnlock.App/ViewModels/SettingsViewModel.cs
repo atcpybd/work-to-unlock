@@ -86,6 +86,16 @@ public sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     public partial bool PauseBreakWhileLocked { get; set; }
 
+    /// <summary>0 = full break per completed goal, 1 = earn break time as you go.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsBalanceMode))]
+    public partial int RewardModeIndex { get; set; }
+
+    public bool IsBalanceMode => RewardModeIndex == (int)RewardMode.Balance;
+
+    [ObservableProperty]
+    public partial double BalanceCapMinutes { get; set; } = 60;
+
     [ObservableProperty]
     public partial bool EnforcementEnabled { get; set; } = true;
 
@@ -144,6 +154,8 @@ public sealed partial class SettingsViewModel : ObservableObject
             MinimizeToTray = MinimizeToTray,
             NotificationsEnabled = NotificationsEnabled,
             PauseBreakWhileLocked = PauseBreakWhileLocked,
+            RewardMode = (RewardMode)Math.Clamp(RewardModeIndex, 0, 1),
+            BalanceCapMinutes = ToInt(BalanceCapMinutes),
         };
 
         // Validate locally first for instant feedback; the agent validates again.
@@ -323,6 +335,8 @@ public sealed partial class SettingsViewModel : ObservableObject
         MinimizeToTray = settings.MinimizeToTray;
         NotificationsEnabled = settings.NotificationsEnabled;
         PauseBreakWhileLocked = settings.PauseBreakWhileLocked;
+        RewardModeIndex = (int)settings.RewardMode;
+        BalanceCapMinutes = settings.BalanceCapMinutes;
         EnforcementEnabled = settings.EnforcementEnabled;
         HasChanges = false;
         _loading = false;
@@ -346,7 +360,8 @@ public sealed partial class SettingsViewModel : ObservableObject
         base.OnPropertyChanged(e);
         if (!_loading && e.PropertyName is nameof(WorkRequirementMinutes) or nameof(RewardDurationMinutes) or nameof(IdleThresholdSeconds)
                 or nameof(GracefulCloseTimeoutSeconds) or nameof(DataRetentionDays) or nameof(DailyGoalMinutes) or nameof(EnforcementModeIndex) or nameof(ThemeIndex)
-                or nameof(StartWithWindows) or nameof(MinimizeToTray) or nameof(NotificationsEnabled) or nameof(PauseBreakWhileLocked))
+                or nameof(StartWithWindows) or nameof(MinimizeToTray) or nameof(NotificationsEnabled) or nameof(PauseBreakWhileLocked)
+                or nameof(RewardModeIndex) or nameof(BalanceCapMinutes))
         {
             HasChanges = true;
         }

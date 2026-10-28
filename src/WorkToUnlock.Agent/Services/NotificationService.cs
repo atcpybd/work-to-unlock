@@ -19,6 +19,7 @@ public sealed class NotificationService(ITrayPresenter tray, SettingsService set
     private RewardState? _lastState;
     private DateTimeOffset? _warnedActivation;
     private int _warningsShown;
+    private bool _balanceFull;
 
     public void Start()
     {
@@ -32,6 +33,8 @@ public sealed class NotificationService(ITrayPresenter tray, SettingsService set
         var message = status.State switch
         {
             RewardState.RewardReady => "Your reward is ready. Unlock it from the Work to Unlock tray menu.",
+            _ when status.Mode == RewardMode.Balance && status.CanActivate => $"You have {Format(status.Balance)} of break time saved. Start a break from the Work to Unlock tray menu.",
+            _ when status.Mode == RewardMode.Balance => "Work in your approved apps to save up break time.",
             _ => $"Work {Format(status.RemainingWork)} more in your approved apps to unlock it.",
         };
         Show($"blocked:{rule.Id}", BlockedCooldown, $"{rule.Name} is locked", message);
@@ -67,9 +70,17 @@ public sealed class NotificationService(ITrayPresenter tray, SettingsService set
         }
     }
 
-    /// <summary>Called by the main loop: warns before an active reward ends.</summary>
+    /// <summary>Called by the main loop: warns before an active reward ends, and when saved break time is full.</summary>
     public void CheckRewardCountdown(RewardStatus status)
     {
+        var balanceFull = status.Mode == RewardMode.Balance && status.State == RewardState.Working && status.Balance >= status.BalanceCap;
+        if (balanceFull && !_balanceFull)
+        {
+            Show("balance-full", TimeSpan.Zero, "Break time is full", $"You have {Format(status.BalanceCap)} saved, the most you can keep. Take a break to keep earning.");
+        }
+
+        _balanceFull = balanceFull;
+
         if (status.State != RewardState.Unlocked || status.RewardActivatedUtc is null)
         {
             return;
@@ -106,6 +117,9 @@ public sealed class NotificationService(ITrayPresenter tray, SettingsService set
                 break;
             case RewardState.Unlocked:
                 Show("unlocked", TimeSpan.Zero, "Apps unlocked", $"Restricted apps are available for {Format(status.RemainingReward)}.");
+                break;
+            case RewardState.Working when previous == RewardState.Unlocked && status.Balance >= RewardStatus.MinimumBalanceToSpend:
+                Show("ended", TimeSpan.Zero, "Break ended", $"Restricted apps are locked again. {Format(status.Balance)} of break time is saved for later.");
                 break;
             case RewardState.Working when previous == RewardState.Unlocked:
                 Show("ended", TimeSpan.Zero, "Reward ended", "Restricted apps are locked again. Time to get back to work.");

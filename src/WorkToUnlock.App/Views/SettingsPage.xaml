@@ -56,6 +56,25 @@
                         <Grid Style="{StaticResource SettingRowStyle}">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                             <StackPanel>
+                                <TextBlock Text="How breaks are earned" />
+                                <TextBlock Style="{StaticResource SecondaryTextStyle}" Text="Full break: reach the work requirement, then unlock the whole reward. Earn as you go: work saves break time in the same proportion, to spend whenever you like and stop early to keep the rest." />
+                            </StackPanel>
+                            <ComboBox Grid.Column="1" Width="220" SelectedIndex="{x:Bind ViewModel.RewardModeIndex, Mode=TwoWay}" AutomationProperties.Name="How breaks are earned">
+                                <ComboBoxItem Content="Full break per goal" />
+                                <ComboBoxItem Content="Earn as you go" />
+                            </ComboBox>
+                        </Grid>
+                        <Grid Style="{StaticResource SettingRowStyle}" Visibility="{x:Bind ViewModel.IsBalanceMode, Mode=OneWay}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="Most break time to save" />
+                                <TextBlock Style="{StaticResource SecondaryTextStyle}" Text="Minutes of break time you can save up (5–480). Work stops adding to it once it's full." />
+                            </StackPanel>
+                            <NumberBox Grid.Column="1" Style="{StaticResource SettingNumberStyle}" Minimum="5" Maximum="480" SmallChange="5" LargeChange="30" Value="{x:Bind ViewModel.BalanceCapMinutes, Mode=TwoWay}" AutomationProperties.Name="Most break time to save in minutes" />
+                        </Grid>
+                        <Grid Style="{StaticResource SettingRowStyle}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <StackPanel>
                                 <TextBlock Text="Idle threshold" />
                                 <TextBlock Style="{StaticResource SecondaryTextStyle}" Text="Pauses without keyboard or mouse input count only if you continue within this many seconds; a longer pause, such as stepping away, does not count at all (10–3600)." />
                             </StackPanel>

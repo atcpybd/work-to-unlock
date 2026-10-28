@@ -12,7 +12,7 @@
                 <StackPanel Spacing="4">
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <Ellipse Width="9" Height="9" VerticalAlignment="Center" Fill="{ThemeResource SystemFillColorSuccessBrush}" Visibility="{x:Bind ShowIndicator, Mode=OneWay}" />
-                        <TextBlock Style="{StaticResource SecondaryTextStyle}" Text="{x:Bind Title}" />
+                        <TextBlock Style="{StaticResource SecondaryTextStyle}" Text="{x:Bind Title, Mode=OneWay}" />
                     </StackPanel>
                     <TextBlock Style="{StaticResource MetricValueStyle}" Text="{x:Bind Value, Mode=OneWay}" TextTrimming="CharacterEllipsis" />
                     <TextBlock Style="{StaticResource SecondaryTextStyle}" Text="{x:Bind Detail, Mode=OneWay}" MaxLines="3" TextTrimming="CharacterEllipsis" />
@@ -68,7 +68,7 @@
                             AutomationProperties.Name="{x:Bind ViewModel.UnlockButtonText, Mode=OneWay}"
                             Command="{x:Bind ViewModel.ActivateCommand}"
                             Style="{StaticResource AccentButtonStyle}"
-                            Visibility="{x:Bind ViewModel.IsReady, Mode=OneWay}">
+                            Visibility="{x:Bind ViewModel.CanActivate, Mode=OneWay}">
                             <StackPanel Orientation="Horizontal" Spacing="10">
                                 <FontIcon FontSize="18" Glyph="&#xE785;" />
                                 <TextBlock FontSize="16" FontWeight="SemiBold" Text="{x:Bind ViewModel.UnlockButtonText, Mode=OneWay}" />
@@ -78,6 +78,16 @@
                             <FontIcon Glyph="&#xE916;" FontSize="16" Foreground="{ThemeResource SystemFillColorSuccessBrush}" />
                             <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{x:Bind ViewModel.ExpiresText, Mode=OneWay}" />
                         </StackPanel>
+                        <Button
+                            Margin="0,6,0,0"
+                            AutomationProperties.Name="End break and save the time left"
+                            Command="{x:Bind ViewModel.EndBreakCommand}"
+                            Visibility="{x:Bind ViewModel.CanEndEarly, Mode=OneWay}">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon FontSize="14" Glyph="&#xE71A;" />
+                                <TextBlock Text="End break and save the time left" />
+                            </StackPanel>
+                        </Button>
                         <Button
                             Margin="0,6,0,0"
                             AutomationProperties.Name="Reset timer"

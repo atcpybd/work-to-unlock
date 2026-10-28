@@ -94,6 +94,14 @@ public sealed partial class DashboardViewModel : ObservableObject
     [ObservableProperty]
     public partial bool IsReady { get; set; }
 
+    /// <summary>A break can start now: a goal reward is ready, or (balance mode) enough break time is saved.</summary>
+    [ObservableProperty]
+    public partial bool CanActivate { get; set; }
+
+    /// <summary>Balance mode: the running break can end early, saving the time left.</summary>
+    [ObservableProperty]
+    public partial bool CanEndEarly { get; set; }
+
     [ObservableProperty]
     public partial bool IsUnlocked { get; set; }
 
@@ -213,8 +221,13 @@ public sealed partial class DashboardViewModel : ObservableObject
     private async Task ResetAsync()
     {
         var reward = _agent.LastStatus?.Reward;
+        var balanceMode = reward?.Mode == RewardMode.Balance;
         var (title, message) = reward?.State switch
         {
+            RewardState.Unlocked when balanceMode => ("End your break and reset?",
+                "Your break ends now without saving the time left, and restricted apps are locked again."),
+            RewardState.Working when balanceMode => ("Reset your saved break time?",
+                $"Your {Format.Countdown(reward.Balance)} of saved break time goes back to 00:00."),
             RewardState.RewardReady => ("Reset and give up your break?",
                 $"Your earned {Format.Duration(reward.RewardDuration)} break is discarded and the work timer starts again from 00:00."),
             RewardState.Unlocked => ("End your break and reset?",
@@ -239,6 +252,19 @@ public sealed partial class DashboardViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private async Task EndBreakAsync()
+    {
+        try
+        {
+            await _agent.RequestAsync<OperationResult>(AgentMethods.EndBreakEarly);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or IOException or Infrastructure.Ipc.IpcException or TimeoutException)
+        {
+            await _dialogs.ShowMessageAsync("Could not end the break", ex.Message);
+        }
+    }
+
+    [RelayCommand]
     private async Task ActivateAsync()
     {
         try
@@ -248,7 +274,7 @@ public sealed partial class DashboardViewModel : ObservableObject
             {
                 await _dialogs.ShowMessageAsync("Reward not available", result.Outcome == ActivationOutcome.AlreadyActive
                     ? "A reward is already active."
-                    : "Finish your work goal first.");
+                    : result.Status.Mode == RewardMode.Balance ? "Save at least a minute of break time first." : "Finish your work goal first.");
             }
             else if (result?.Status is { } status)
             {
@@ -384,14 +410,41 @@ public sealed partial class DashboardViewModel : ObservableObject
         Progress = reward.State == RewardState.Unlocked && reward.RewardDuration > TimeSpan.Zero
             ? reward.RemainingReward.TotalSeconds / reward.RewardDuration.TotalSeconds
             : reward.ProgressFraction;
+        var balanceMode = reward.Mode == RewardMode.Balance;
         IsWorking = reward.State == RewardState.Working;
         IsReady = reward.State == RewardState.RewardReady;
         IsUnlocked = reward.State == RewardState.Unlocked;
-        CanReset = reward.State != RewardState.Working || reward.AccumulatedWork > TimeSpan.Zero;
+        CanActivate = reward.CanActivate;
+        CanEndEarly = reward.CanEndEarly;
+        CanReset = reward.State != RewardState.Working || reward.AccumulatedWork > TimeSpan.Zero || reward.Balance > TimeSpan.Zero;
         RewardText = Format.Duration(reward.RewardDuration);
-        UnlockButtonText = $"Unlock Apps for {Format.LongDuration(reward.RewardDuration)}";
+        UnlockButtonText = balanceMode
+            ? $"Start Break ({Format.Duration(reward.Balance)})"
+            : $"Unlock Apps for {Format.LongDuration(reward.RewardDuration)}";
         // While working, show minutes and seconds so progress visibly ticks with each per-second status update.
         RemainingWorkText = reward.State == RewardState.Working ? Format.Countdown(reward.RemainingWork) : "Done";
+
+        RemainingMetric.Title = balanceMode ? "Earning rate" : "Work remaining";
+        RemainingMetric.Detail = balanceMode ? "Break time saved per work time in approved apps." : "Only active time in approved apps counts.";
+        RewardMetric.Title = balanceMode ? "Most you can save" : "Reward";
+        RewardMetric.Detail = balanceMode ? "Take a break to keep earning once it's full." : "Access to restricted apps per completed goal.";
+        if (balanceMode)
+        {
+            RemainingWorkText = $"{Format.Duration(reward.RewardDuration)} per {Format.Duration(reward.RequiredWork)}";
+            RewardText = Format.Duration(reward.BalanceCap);
+        }
+
+        if (balanceMode && reward.State == RewardState.Working)
+        {
+            Progress = reward.BalanceCap > TimeSpan.Zero ? Math.Clamp(reward.Balance / reward.BalanceCap, 0, 1) : 0;
+            WorkedText = Format.Countdown(reward.Balance);
+            RequiredText = reward.Balance >= reward.BalanceCap ? "saved · full" : "break time saved";
+            Headline = reward.CanActivate ? "Break time saved" : "Time to focus";
+            Subtitle = reward.Balance >= reward.BalanceCap
+                ? $"You have {Format.Duration(reward.BalanceCap)} saved, the most you can keep. Take a break to keep earning."
+                : $"Every {Format.Duration(reward.RequiredWork)} of work saves {Format.Duration(reward.RewardDuration)} of break time. Start a break whenever you like, and end it early to keep the rest.";
+            return;
+        }
 
         switch (reward.State)
         {
@@ -411,7 +464,9 @@ public sealed partial class DashboardViewModel : ObservableObject
                 Headline = reward.IsPaused ? "Break paused" : "Apps unlocked";
                 Subtitle = reward.IsPaused
                     ? "Your break continues with the same time left when you're back."
-                    : "Enjoy your break. Restricted apps lock again when the countdown ends.";
+                    : balanceMode
+                        ? "Enjoy your break. End it early to save the time left for later."
+                        : "Enjoy your break. Restricted apps lock again when the countdown ends.";
                 break;
             default:
                 WorkedText = Format.Countdown(reward.AccumulatedWork);
@@ -544,7 +599,8 @@ public sealed partial class PresetViewModel : ObservableObject
 
 public sealed partial class MetricViewModel(string title) : ObservableObject
 {
-    public string Title { get; } = title;
+    [ObservableProperty]
+    public partial string Title { get; set; } = title;
 
     [ObservableProperty]
     public partial string Value { get; set; } = "–";
