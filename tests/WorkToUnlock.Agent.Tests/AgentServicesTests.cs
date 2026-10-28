@@ -160,6 +160,26 @@ public sealed class EnforcementCoordinatorTests : IDisposable
     }
 
     [Fact]
+    public async Task Health_is_read_live_from_the_enforcer_not_from_a_cached_copy()
+    {
+        await _h.StartAsync();
+        Assert.Equal(EnforcementHealthState.Healthy, _h.Coordinator.Health.State);
+        var scanned = new DateTimeOffset(2026, 1, 5, 9, 30, 0, TimeSpan.Zero);
+
+        _h.Enforcer.SetHealthSilently(_h.Enforcer.Health with
+        {
+            State = EnforcementHealthState.Failed,
+            Message = "stopped",
+            LastScanUtc = scanned,
+            Problems = ["The enforcement check has stopped running."],
+        });
+
+        Assert.Equal(EnforcementHealthState.Failed, _h.Coordinator.Health.State);
+        Assert.Equal(scanned, _h.Coordinator.Health.LastScanUtc);
+        Assert.Contains("The enforcement check has stopped running.", _h.Coordinator.Health.Problems);
+    }
+
+    [Fact]
     public async Task Strict_mode_with_the_service_reports_launch_prevention()
     {
         _h.Strict.Available = true;

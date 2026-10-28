@@ -31,17 +31,33 @@ public sealed class ProcessEnforcer(
     private bool _firstScan;
     private int _consecutiveFailures;
     private int _handledCount;
+    private long _lastScanMono;
     private CancellationTokenSource? _loopCts;
     private Task? _loop;
     private EnforcementHealth _health = EnforcementHealth.Inactive(EnforcementMode.CloseThenTerminate, "Restrictions are not active.");
 
+    /// <summary>
+    /// Current health. While restrictions are active this also checks that scans are still completing: a scan loop
+    /// that stopped or hangs is reported as failed rather than repeating its last healthy result.
+    /// </summary>
     public EnforcementHealth Health
     {
         get
         {
             lock (_lock)
             {
-                return _health;
+                var sinceLastScan = TimeSpan.FromMilliseconds(clock.MonotonicMilliseconds - _lastScanMono);
+                if (!_active || sinceLastScan <= _options.StaleAfter)
+                {
+                    return _health;
+                }
+
+                return _health with
+                {
+                    State = EnforcementHealthState.Failed,
+                    Message = $"Restricted apps have not been checked for {(int)sinceLastScan.TotalSeconds} seconds. Restart Work to Unlock if this continues.",
+                    Problems = [.. _health.Problems, "The enforcement check has stopped running."],
+                };
             }
         }
     }
@@ -69,6 +85,7 @@ public sealed class ProcessEnforcer(
 
                 previousLoop = StopLoopLocked();
                 _active = true;
+                _lastScanMono = clock.MonotonicMilliseconds;
                 _loopCts = new CancellationTokenSource();
                 var token = _loopCts.Token;
                 _options = options;
@@ -145,6 +162,7 @@ public sealed class ProcessEnforcer(
             {
                 ScanLocked();
                 _consecutiveFailures = 0;
+                _lastScanMono = clock.MonotonicMilliseconds;
             }
             catch (Exception ex)
             {

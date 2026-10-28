@@ -74,6 +74,9 @@ internal sealed class FakeEnforcer : IAppEnforcer
 
     public event EventHandler<EnforcementHealth>? HealthChanged;
 
+    /// <summary>Changes the reported health without raising <see cref="HealthChanged"/> (like a scan loop that silently stops).</summary>
+    public void SetHealthSilently(EnforcementHealth health) => Health = health;
+
     public Task ApplyRestrictionsAsync(IReadOnlyCollection<ApplicationRule> rules, EnforcementOptions options, CancellationToken cancellationToken)
     {
         ApplyCalls++;

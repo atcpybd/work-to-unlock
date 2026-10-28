@@ -58,6 +58,12 @@ public sealed record EnforcementOptions
     /// <summary>In close-only mode, how often a still-running restricted app is asked again to close.</summary>
     public TimeSpan RecloseInterval { get; init; } = TimeSpan.FromSeconds(30);
 
+    /// <summary>
+    /// If no scan has completed for this long while restrictions are active, health is reported as failed
+    /// instead of repeating the last (stale) result. Five scan intervals, at least five seconds.
+    /// </summary>
+    public TimeSpan StaleAfter => ScanInterval * 5 > TimeSpan.FromSeconds(5) ? ScanInterval * 5 : TimeSpan.FromSeconds(5);
+
     public static EnforcementOptions From(AppSettings settings) => new()
     {
         Mode = settings.EnforcementMode,

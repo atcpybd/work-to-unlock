@@ -187,6 +187,50 @@ public sealed class ProcessEnforcerTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task Health_reports_failure_when_scans_stop_and_recovers_when_they_resume()
+    {
+        await ApplyAsync();
+        Assert.Equal(EnforcementHealthState.Healthy, _enforcer.Health.State);
+
+        // Within the allowed scan age (5 × scan interval) the last result still stands.
+        _clock.Advance(TimeSpan.FromHours(4));
+        Assert.Equal(EnforcementHealthState.Healthy, _enforcer.Health.State);
+
+        // No scan for longer than that: the enforcer must not keep claiming protection.
+        _clock.Advance(TimeSpan.FromHours(2));
+        var stale = _enforcer.Health;
+        Assert.Equal(EnforcementHealthState.Failed, stale.State);
+        Assert.True(stale.RestrictionsApplied);
+        Assert.NotEmpty(stale.Problems);
+
+        _enforcer.ScanOnce();
+        Assert.Equal(EnforcementHealthState.Healthy, _enforcer.Health.State);
+    }
+
+    [Fact]
+    public async Task Health_reports_the_time_of_the_latest_scan()
+    {
+        await ApplyAsync();
+        var first = _enforcer.Health.LastScanUtc;
+
+        _clock.Advance(TimeSpan.FromSeconds(30));
+        _enforcer.ScanOnce();
+
+        Assert.Equal(first!.Value.AddSeconds(30), _enforcer.Health.LastScanUtc);
+    }
+
+    [Fact]
+    public async Task Inactive_enforcement_is_never_reported_as_stale()
+    {
+        await ApplyAsync();
+        await _enforcer.RemoveRestrictionsAsync("Reward active", CancellationToken.None);
+
+        _clock.Advance(TimeSpan.FromDays(1));
+
+        Assert.Equal(EnforcementHealthState.Inactive, _enforcer.Health.State);
+    }
+
+    [Fact]
     public async Task Updating_rules_keeps_tracking_already_handled_processes()
     {
         _inspector.Start(50, GamePath);

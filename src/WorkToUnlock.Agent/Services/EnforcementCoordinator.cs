@@ -21,12 +21,12 @@ public sealed class EnforcementCoordinator(
     ILogger<EnforcementCoordinator> logger) : IDisposable
 {
     private readonly SemaphoreSlim _gate = new(1, 1);
-    private volatile EnforcementHealth _health = EnforcementHealth.Inactive(EnforcementMode.CloseThenTerminate, "Starting…");
-    private string? _strictProblem;
-    private bool _strictApplied;
+    private volatile string? _strictProblem;
+    private volatile bool _strictApplied;
     private bool _started;
 
-    public EnforcementHealth Health => _health;
+    /// <summary>Combined health, computed on every read from the enforcer's live health (never a cached copy).</summary>
+    public EnforcementHealth Health => Compose(processEnforcer.Health);
 
     public event EventHandler<EnforcementHealth>? HealthChanged;
 
@@ -134,9 +134,10 @@ public sealed class EnforcementCoordinator(
 
     private void Trigger(string reason) => _ = Task.Run(() => ReconcileAsync(reason, CancellationToken.None));
 
-    private void PublishHealth()
+    private void PublishHealth() => HealthChanged?.Invoke(this, Health);
+
+    private EnforcementHealth Compose(EnforcementHealth process)
     {
-        var process = processEnforcer.Health;
         var problems = process.Problems.ToList();
         if (_strictProblem is not null)
         {
@@ -149,14 +150,12 @@ public sealed class EnforcementCoordinator(
             state = EnforcementHealthState.Degraded;
         }
 
-        var health = process with
+        return process with
         {
             State = state,
             Mode = settings.Current.EnforcementMode,
             LaunchPreventionActive = _strictApplied && process.RestrictionsApplied,
             Problems = problems,
         };
-        _health = health;
-        HealthChanged?.Invoke(this, health);
     }
 }
