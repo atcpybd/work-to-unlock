@@ -144,6 +144,40 @@ public sealed partial class DashboardViewModel : ObservableObject
     [ObservableProperty]
     public partial bool HasNoRestrictedApps { get; set; }
 
+    /// <summary>True when there is something to reset: work time so far, a ready break, or a running break.</summary>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(ResetCommand))]
+    public partial bool CanReset { get; set; }
+
+    [RelayCommand(CanExecute = nameof(CanReset))]
+    private async Task ResetAsync()
+    {
+        var reward = _agent.LastStatus?.Reward;
+        var (title, message) = reward?.State switch
+        {
+            RewardState.RewardReady => ("Reset and give up your break?",
+                $"Your earned {Format.Duration(reward.RewardDuration)} break is discarded and the work timer starts again from 00:00."),
+            RewardState.Unlocked => ("End your break and reset?",
+                "Your break ends now, restricted apps are locked again, and the work timer starts from 00:00."),
+            _ => ("Reset the work timer?",
+                $"Your {Format.Countdown(reward?.AccumulatedWork ?? TimeSpan.Zero)} of work so far goes back to 00:00."),
+        };
+
+        if (!await _dialogs.ConfirmAsync(title, message + " This is recorded in the activity log.", "Reset", destructive: true))
+        {
+            return;
+        }
+
+        try
+        {
+            await _agent.RequestAsync<OperationResult>(AgentMethods.ResetProgress, new ResetProgressRequest("Reset from the dashboard"));
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or IOException or Infrastructure.Ipc.IpcException or TimeoutException)
+        {
+            await _dialogs.ShowMessageAsync("Could not reset", ex.Message);
+        }
+    }
+
     [RelayCommand]
     private async Task ActivateAsync()
     {
@@ -293,6 +327,7 @@ public sealed partial class DashboardViewModel : ObservableObject
         IsWorking = reward.State == RewardState.Working;
         IsReady = reward.State == RewardState.RewardReady;
         IsUnlocked = reward.State == RewardState.Unlocked;
+        CanReset = reward.State != RewardState.Working || reward.AccumulatedWork > TimeSpan.Zero;
         RewardText = Format.Duration(reward.RewardDuration);
         UnlockButtonText = $"Unlock Apps for {Format.LongDuration(reward.RewardDuration)}";
         // While working, show minutes and seconds so progress visibly ticks with each per-second status update.
