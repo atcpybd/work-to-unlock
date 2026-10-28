@@ -48,10 +48,11 @@ jobs:
         run: dotnet restore WorkToUnlock.sln
       - name: Build (including the WinUI dashboard)
         run: dotnet build WorkToUnlock.sln -c Release --no-restore
-      - name: Unit tests
-        run: >
-          dotnet test tests/WorkToUnlock.Core.Tests tests/WorkToUnlock.Agent.Tests -c Release --no-build
-          --logger "trx;LogFilePrefix=windows-unit" --results-directory TestResults
+      # dotnet test takes one project per call, and a multi-line pwsh step only fails on its last command.
+      - name: Core unit tests
+        run: dotnet test tests/WorkToUnlock.Core.Tests -c Release --no-build --logger "trx;LogFilePrefix=windows-core" --results-directory TestResults
+      - name: Agent unit tests
+        run: dotnet test tests/WorkToUnlock.Agent.Tests -c Release --no-build --logger "trx;LogFilePrefix=windows-agent" --results-directory TestResults
       - name: Windows integration tests
         # Launches a harmless test target and an isolated agent instance; never touches real applications.
         run: >
