@@ -168,8 +168,8 @@ public sealed class AgentService(IServiceProvider services, ILogger<AgentService
         var notifications = services.GetRequiredService<NotificationService>();
         var maintenance = services.GetRequiredService<MaintenanceService>();
 
-        var lastStatus = long.MinValue;
-        var lastMaintenance = long.MinValue;
+        var statusCadence = new Cadence(StatusInterval);
+        var maintenanceCadence = new Cadence(MaintenanceInterval);
         using var timer = new PeriodicTimer(SampleInterval);
         do
         {
@@ -184,16 +184,14 @@ public sealed class AgentService(IServiceProvider services, ILogger<AgentService
                 logger.LogError(ex, "Tracking iteration failed");
             }
 
-            if (now - lastStatus >= (long)StatusInterval.TotalMilliseconds)
+            if (statusCadence.IsDue(now))
             {
-                lastStatus = now;
                 notifications.CheckRewardCountdown(engine.GetStatus());
                 await PublishStatusAsync().ConfigureAwait(false);
             }
 
-            if (now - lastMaintenance >= (long)MaintenanceInterval.TotalMilliseconds)
+            if (maintenanceCadence.IsDue(now))
             {
-                lastMaintenance = now;
                 _ = Task.Run(() => maintenance.RunIfDueAsync(cancellationToken), cancellationToken);
             }
         }

@@ -106,6 +106,28 @@ public sealed class AgentEndToEndTests : IDisposable
         Assert.Equal(0, agent.ExitCode);
     }
 
+    [WindowsFact]
+    public async Task Agent_broadcasts_status_to_subscribers_every_second()
+    {
+        Assert.True(File.Exists(TestPaths.AgentExecutable), $"Build the agent first: {TestPaths.AgentExecutable}");
+        StartAgent();
+        await using var client = await ConnectAsync();
+        var received = 0;
+        client.EventReceived += (_, e) =>
+        {
+            if (e.Name == AgentEvents.Status && e.GetPayload<AgentStatus>() is not null)
+            {
+                Interlocked.Increment(ref received);
+            }
+        };
+
+        await client.SendAsync(AgentMethods.Subscribe, null, CancellationToken.None);
+        await Task.Delay(TimeSpan.FromSeconds(4.5));
+
+        // The dashboard relies on these pushes; without them it only shows the status from when it connected.
+        Assert.True(received >= 3, $"Expected a status event about every second, got {received} in 4.5 s.");
+    }
+
     private Process StartAgent()
     {
         var start = new ProcessStartInfo(TestPaths.AgentExecutable) { UseShellExecute = false };
