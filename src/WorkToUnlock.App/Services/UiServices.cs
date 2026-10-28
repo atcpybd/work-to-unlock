@@ -43,6 +43,7 @@ public static class Format
     /// <summary>Minutes, rounding up, for remaining-time messages ("unlock in 12 min").</summary>
     public static string DurationCeiling(TimeSpan time) => Duration(TimeSpan.FromMinutes(Math.Ceiling(Math.Max(0, time.TotalMinutes))));
 
+    /// <summary>Clock-style time for elapsed work and countdowns: "mm:ss", or "h:mm:ss" from one hour.</summary>
     public static string Countdown(TimeSpan time)
     {
         if (time < TimeSpan.Zero)

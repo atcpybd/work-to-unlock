@@ -295,7 +295,8 @@ public sealed partial class DashboardViewModel : ObservableObject
         IsUnlocked = reward.State == RewardState.Unlocked;
         RewardText = Format.Duration(reward.RewardDuration);
         UnlockButtonText = $"Unlock Apps for {Format.LongDuration(reward.RewardDuration)}";
-        RemainingWorkText = reward.State == RewardState.Working ? Format.DurationCeiling(reward.RemainingWork) : "Done";
+        // While working, show minutes and seconds so progress visibly ticks with each per-second status update.
+        RemainingWorkText = reward.State == RewardState.Working ? Format.Countdown(reward.RemainingWork) : "Done";
 
         switch (reward.State)
         {
@@ -314,7 +315,7 @@ public sealed partial class DashboardViewModel : ObservableObject
                 Subtitle = "Enjoy your break. The countdown keeps running even if you step away or the PC sleeps.";
                 break;
             default:
-                WorkedText = Format.Duration(reward.AccumulatedWork);
+                WorkedText = Format.Countdown(reward.AccumulatedWork);
                 RequiredText = $"of {Format.Duration(reward.RequiredWork)}";
                 Headline = reward.AccumulatedWork == TimeSpan.Zero ? "Time to focus" : "Keep going";
                 Subtitle = $"Work {Format.DurationCeiling(reward.RemainingWork)} more in your approved apps to unlock {Format.Duration(reward.RewardDuration)} of restricted apps.";
