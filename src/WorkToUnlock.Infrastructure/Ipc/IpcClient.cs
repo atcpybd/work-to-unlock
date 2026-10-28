@@ -1,5 +1,7 @@
 using System.Collections.Concurrent;
 using System.IO.Pipes;
+using System.Runtime.Versioning;
+using System.Security.Principal;
 using System.Text;
 using System.Text.Json;
 using WorkToUnlock.Core.Ipc;
@@ -41,16 +43,14 @@ public sealed class IpcClient : IAsyncDisposable
     /// </param>
     public static async Task<IpcClient> ConnectAsync(string pipeName, TimeSpan timeout, bool requireSameUserServer, CancellationToken cancellationToken)
     {
-        var options = PipeOptions.Asynchronous;
-        if (requireSameUserServer && OperatingSystem.IsWindows())
-        {
-            options |= PipeOptions.CurrentUserOnly;
-        }
-
-        var stream = new NamedPipeClientStream(".", pipeName, PipeDirection.InOut, options);
+        var stream = new NamedPipeClientStream(".", pipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
         try
         {
             await stream.ConnectAsync(timeout, cancellationToken).ConfigureAwait(false);
+            if (requireSameUserServer && OperatingSystem.IsWindows())
+            {
+                VerifyOwnedByCurrentUser(stream);
+            }
         }
         catch
         {
@@ -61,6 +61,22 @@ public sealed class IpcClient : IAsyncDisposable
         var client = new IpcClient(stream);
         client._readLoop = Task.Run(client.ReadLoopAsync);
         return client;
+    }
+
+    /// <summary>
+    /// Only a process running as this user can make this user the owner of the pipe, so another user cannot pose as
+    /// the agent. Unlike <see cref="PipeOptions.CurrentUserOnly"/>, which compares with the token's default owner,
+    /// this compares with the user SID: for an elevated process (UAC off, or "Run as administrator") the default
+    /// owner is BUILTIN\Administrators and the agent's pipe would be rejected.
+    /// </summary>
+    [SupportedOSPlatform("windows")]
+    private static void VerifyOwnedByCurrentUser(NamedPipeClientStream stream)
+    {
+        var owner = stream.GetAccessControl().GetOwner(typeof(SecurityIdentifier));
+        if (owner is null || !owner.Equals(WindowsIdentity.GetCurrent().User))
+        {
+            throw new UnauthorizedAccessException("Could not connect to the pipe because it is not owned by the current user.");
+        }
     }
 
     public async Task<JsonElement?> SendAsync(string method, object? payload, CancellationToken cancellationToken, TimeSpan? timeout = null)
