@@ -29,7 +29,7 @@
 |---|---|
 | `AgentService` | Bootstrap (database → settings → rules → reward state → enforcement → IPC) and the 500 ms loop: sample, track, expire rewards, publish status every second, hourly maintenance. |
 | `ActivitySampler` | One `ActivitySample` per tick: monotonic ms (`GetTickCount64`), UTC, foreground app, idle time, session state. |
-| `WorkTracker` | Credits the interval between two consecutive samples only when both qualify and the gap is ≤ 5 s. Records per-app `WorkSessions`. Persists every 15 s and on session changes. |
+| `WorkTracker` | Credits the interval between two consecutive samples only when both qualify and the gap is ≤ 5 s. Time after the last keyboard or mouse input is held back and credited only when input resumes within the idle threshold (or the user switches apps with input); it is dropped at the threshold, on lock, or on a gap, so time away from the PC never counts. Records per-app `WorkSessions`. Persists every 15 s and on session changes. |
 | `RewardEngine` | Deterministic state machine. All mutations are serialized; each transition is saved (with audit and reward-history rows, in one transaction) *before* `StateChanged` is raised. |
 | `EnforcementCoordinator` | Restrictions on ⇔ enforcement enabled ∧ state ≠ Unlocked ∧ any enabled restricted rule. Drives the process enforcer and, in strict mode, the service. |
 | `ProcessEnforcer` | Stage A enforcement; see [enforcement.md](enforcement.md). |

@@ -55,6 +55,12 @@ public sealed record TrackingSnapshot
 
     public TimeSpan IdleDuration { get; init; }
 
+    /// <summary>
+    /// Work time since the last keyboard or mouse input. It is held back: added once input resumes within the idle
+    /// threshold, dropped if it does not, so time spent away from the PC is never counted.
+    /// </summary>
+    public TimeSpan HeldWork { get; init; }
+
     public DateTimeOffset? LastSampleUtc { get; init; }
 
     public static TrackingSnapshot Unknown { get; } = new();

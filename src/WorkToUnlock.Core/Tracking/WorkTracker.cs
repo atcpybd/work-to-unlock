@@ -53,6 +53,7 @@ public sealed class WorkTracker(
     private volatile TrackingSnapshot _current = TrackingSnapshot.Unknown;
     private volatile bool _persistenceHealthy = true;
     private LastSample? _last;
+    private long _heldMilliseconds;
     private OpenSession? _open;
     private long? _lastPersistMono;
 
@@ -73,27 +74,31 @@ public sealed class WorkTracker(
 
             // Record the sample before any I/O so a failed save can never cause an interval to be credited twice.
             _last = new LastSample(sample.MonotonicMilliseconds, status == ActivityStatus.Working ? rule : null);
+
+            var delta = previous is null ? 0 : sample.MonotonicMilliseconds - previous.MonotonicMilliseconds;
+            if (previous is null || delta > (long)options.MaxSampleGap.TotalMilliseconds)
+            {
+                if (delta > 0)
+                {
+                    logger.LogDebug("Skipped crediting a {Gap} ms sampling gap", delta);
+                }
+
+                _heldMilliseconds = 0;
+            }
+            else if (delta > 0)
+            {
+                await SettleIntervalAsync(previous.QualifyingRule, status, sample, delta, cancellationToken).ConfigureAwait(false);
+            }
+
             _current = new TrackingSnapshot
             {
                 Status = status,
                 CurrentRuleId = rule?.Id,
                 CurrentApplicationName = rule?.Name,
                 IdleDuration = sample.IdleDuration,
+                HeldWork = TimeSpan.FromMilliseconds(_heldMilliseconds),
                 LastSampleUtc = sample.UtcNow,
             };
-
-            if (previous?.QualifyingRule is { } creditedRule && status == ActivityStatus.Working)
-            {
-                var delta = sample.MonotonicMilliseconds - previous.MonotonicMilliseconds;
-                if (delta > 0 && delta <= (long)options.MaxSampleGap.TotalMilliseconds)
-                {
-                    await CreditAsync(creditedRule, delta, sample.UtcNow, cancellationToken).ConfigureAwait(false);
-                }
-                else if (delta > 0)
-                {
-                    logger.LogDebug("Skipped crediting a {Gap} ms sampling gap", delta);
-                }
-            }
 
             if (status == ActivityStatus.Working && rule is not null)
             {
@@ -170,6 +175,49 @@ public sealed class WorkTracker(
         }
 
         return (ActivityStatus.Working, rule);
+    }
+
+    /// <summary>
+    /// Credits one sampling interval that started in a work app. Time after the last keyboard or mouse input is held
+    /// back until new input shows the user is still there; it is dropped when the idle threshold is reached, the
+    /// session locks, or the user leaves without any input. So time spent away from the PC never counts, while short
+    /// pauses for reading or thinking do once the user continues.
+    /// </summary>
+    private async Task SettleIntervalAsync(ApplicationRule? previousRule, ActivityStatus status, ActivitySample sample, long delta, CancellationToken cancellationToken)
+    {
+        if (previousRule is null)
+        {
+            _heldMilliseconds = 0;
+            return;
+        }
+
+        var idleMs = (long)Math.Min(sample.IdleDuration.TotalMilliseconds, long.MaxValue / 2);
+        var inputDuringInterval = sample.Session == SessionState.Active && idleMs < delta;
+        long confirmed;
+        if (status == ActivityStatus.Working)
+        {
+            if (!inputDuringInterval)
+            {
+                _heldMilliseconds += delta;
+                return;
+            }
+
+            // Everything up to the latest input is confirmed; the time since then is held again.
+            confirmed = _heldMilliseconds + (delta - idleMs);
+            _heldMilliseconds = idleMs;
+        }
+        else
+        {
+            // Left the work app (or went idle, or the session locked) during this interval. Input at that moment
+            // proves the user was still there, so the pause before it counts; otherwise it is dropped.
+            confirmed = inputDuringInterval ? _heldMilliseconds : 0;
+            _heldMilliseconds = 0;
+        }
+
+        if (confirmed > 0)
+        {
+            await CreditAsync(previousRule, confirmed, sample.UtcNow, cancellationToken).ConfigureAwait(false);
+        }
     }
 
     private async Task CreditAsync(ApplicationRule rule, long milliseconds, DateTimeOffset utcNow, CancellationToken cancellationToken)

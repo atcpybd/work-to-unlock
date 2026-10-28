@@ -41,7 +41,7 @@ Not automatable or not yet verified. Use a disposable VM where noted.
 ### Tracking
 - [ ] Work in VS Code for 2 minutes with *Work requirement* set to 1: reward becomes ready and a notification appears.
 - [ ] Switch VS Code → Blockbench → VS Code: time keeps counting; switch to a browser: it stops.
-- [ ] Stop touching the keyboard and mouse: counting stops after the idle threshold.
+- [ ] Stop touching the keyboard and mouse: the clock stops immediately; continuing within the idle threshold adds the pause, staying away longer adds none of it.
 - [ ] Lock (Win+L) for a few minutes and unlock: locked time is not counted.
 - [ ] Sleep and resume: sleep time is not counted; an active reward keeps elapsing.
 - [ ] Remote Desktop: disconnect and reconnect; disconnected time is not counted.

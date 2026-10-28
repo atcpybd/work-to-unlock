@@ -326,12 +326,17 @@ public sealed partial class DashboardViewModel : ObservableObject
     private void ApplyActivity(AgentStatus status)
     {
         var tracking = status.Tracking;
-        IsActive = tracking.Status == ActivityStatus.Working && status.Reward.State == RewardState.Working;
+
+        // Time since the last input is held back by the agent; after a few seconds, say so instead of looking active.
+        var waitingForInput = tracking.Status == ActivityStatus.Working && tracking.HeldWork >= TimeSpan.FromSeconds(5);
+        IsActive = tracking.Status == ActivityStatus.Working && status.Reward.State == RewardState.Working && !waitingForInput;
         (ActivityTitle, ActivityDetail) = tracking.Status switch
         {
             ActivityStatus.Working when status.Reward.State != RewardState.Working => (tracking.CurrentApplicationName ?? "Work app", "Active, but work does not count while a reward is ready or running"),
+            ActivityStatus.Working when waitingForInput => (tracking.CurrentApplicationName ?? "Work app",
+                $"No input for {(int)tracking.IdleDuration.TotalSeconds} s: added when you continue, dropped after {_settings.IdleThresholdSeconds} s"),
             ActivityStatus.Working => (tracking.CurrentApplicationName ?? "Work app", "Active: this time counts"),
-            ActivityStatus.Idle => (tracking.CurrentApplicationName ?? "Idle", $"Idle for {Format.Duration(tracking.IdleDuration)}: paused"),
+            ActivityStatus.Idle => (tracking.CurrentApplicationName ?? "Idle", $"Away for {Format.Duration(tracking.IdleDuration)}: not counted"),
             ActivityStatus.NotWorkApp => ("Not a work app", "Switch to an approved app to keep earning"),
             ActivityStatus.Locked => ("PC locked", "Tracking is paused"),
             ActivityStatus.Disconnected => ("Session disconnected", "Tracking is paused"),

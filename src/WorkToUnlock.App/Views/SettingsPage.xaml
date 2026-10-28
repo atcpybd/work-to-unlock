@@ -57,7 +57,7 @@
                             <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                             <StackPanel>
                                 <TextBlock Text="Idle threshold" />
-                                <TextBlock Style="{StaticResource SecondaryTextStyle}" Text="Seconds without keyboard or mouse input after which work time stops counting (10–3600)." />
+                                <TextBlock Style="{StaticResource SecondaryTextStyle}" Text="Pauses without keyboard or mouse input count only if you continue within this many seconds; a longer pause, such as stepping away, does not count at all (10–3600)." />
                             </StackPanel>
                             <NumberBox Grid.Column="1" Style="{StaticResource SettingNumberStyle}" Minimum="10" Maximum="3600" LargeChange="30" Value="{x:Bind ViewModel.IdleThresholdSeconds, Mode=TwoWay}" AutomationProperties.Name="Idle threshold in seconds" />
                         </Grid>

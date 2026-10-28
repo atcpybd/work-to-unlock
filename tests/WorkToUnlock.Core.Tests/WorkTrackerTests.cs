@@ -118,17 +118,102 @@ public sealed class WorkTrackerTests : IAsyncLifetime, IDisposable
         Assert.Equal(TimeSpan.Zero, Accumulated);
     }
 
+    /// <summary>
+    /// No keyboard or mouse input: every 500 ms the idle time grows by 500 ms. <paramref name="alreadyIdle"/> continues
+    /// a pause that started earlier; by default the last input was at the current time.
+    /// </summary>
+    private async Task PauseAsync(string? path, TimeSpan duration, TimeSpan alreadyIdle = default)
+    {
+        var steps = (int)(duration.TotalMilliseconds / 500);
+        for (var i = 1; i <= steps; i++)
+        {
+            _clock.AdvanceMilliseconds(500);
+            await Sample(path, alreadyIdle.TotalSeconds + i * 0.5);
+        }
+    }
+
     [Theory]
-    [InlineData(0, true)]
-    [InlineData(59.5, true)]
-    [InlineData(60, false)]
-    [InlineData(600, false)]
-    public async Task Idle_threshold_boundary(double idleSeconds, bool counts)
+    [InlineData(60, ActivityStatus.Idle)]
+    [InlineData(600, ActivityStatus.Idle)]
+    public async Task Idle_at_or_beyond_the_threshold_never_counts(double idleSeconds, ActivityStatus expected)
     {
         await RunAsync(TestRules.VsCodePath, TimeSpan.FromSeconds(10), idleSeconds);
 
-        Assert.Equal(counts ? TimeSpan.FromSeconds(10) : TimeSpan.Zero, Accumulated);
-        Assert.Equal(counts ? ActivityStatus.Working : ActivityStatus.Idle, _tracker.Current.Status);
+        Assert.Equal(TimeSpan.Zero, Accumulated);
+        Assert.Equal(expected, _tracker.Current.Status);
+    }
+
+    [Fact]
+    public async Task Time_after_the_last_input_is_not_counted_when_the_user_walks_away()
+    {
+        await RunAsync(TestRules.VsCodePath, TimeSpan.FromSeconds(10));
+
+        await PauseAsync(TestRules.VsCodePath, TimeSpan.FromSeconds(45));
+        Assert.Equal(TimeSpan.FromSeconds(10), Accumulated); // held back, not counted while away
+
+        await PauseAsync(TestRules.VsCodePath, TimeSpan.FromSeconds(45), alreadyIdle: TimeSpan.FromSeconds(45)); // 90 s away in total
+        Assert.Equal(TimeSpan.FromSeconds(10), Accumulated);
+        Assert.Equal(ActivityStatus.Idle, _tracker.Current.Status);
+    }
+
+    [Theory]
+    [InlineData(20, 30.5)]
+    [InlineData(59, 69.5)]
+    [InlineData(61, 10)]
+    public async Task A_pause_counts_only_if_input_resumes_within_the_threshold(double pauseSeconds, double expectedSeconds)
+    {
+        await RunAsync(TestRules.VsCodePath, TimeSpan.FromSeconds(10));
+        await PauseAsync(TestRules.VsCodePath, TimeSpan.FromSeconds(pauseSeconds));
+
+        _clock.AdvanceMilliseconds(500);
+        await Sample(TestRules.VsCodePath, idleSeconds: 0); // typing again
+
+        Assert.Equal(TimeSpan.FromSeconds(expectedSeconds), Accumulated);
+    }
+
+    [Fact]
+    public async Task Input_that_switches_to_another_app_keeps_the_pause_before_it()
+    {
+        await RunAsync(TestRules.VsCodePath, TimeSpan.FromSeconds(10));
+        await PauseAsync(TestRules.VsCodePath, TimeSpan.FromSeconds(10)); // reading
+
+        _clock.AdvanceMilliseconds(500);
+        await Sample(TestRules.ChromePath, idleSeconds: 0.1); // Alt+Tab to the browser
+
+        Assert.Equal(TimeSpan.FromSeconds(20), Accumulated);
+    }
+
+    [Fact]
+    public async Task Automatic_lock_after_inactivity_discards_the_pause()
+    {
+        await RunAsync(TestRules.VsCodePath, TimeSpan.FromSeconds(10));
+        await PauseAsync(TestRules.VsCodePath, TimeSpan.FromSeconds(30));
+
+        _clock.AdvanceMilliseconds(500);
+        await Sample(TestRules.VsCodePath, session: SessionState.Locked);
+
+        Assert.Equal(TimeSpan.FromSeconds(10), Accumulated);
+    }
+
+    [Fact]
+    public async Task A_reward_cannot_be_earned_while_away()
+    {
+        await _engine.AddWorkAsync(TimeSpan.FromMinutes(60) - TimeSpan.FromSeconds(5), CancellationToken.None);
+        await RunAsync(TestRules.VsCodePath, TimeSpan.FromSeconds(1));
+
+        await PauseAsync(TestRules.VsCodePath, TimeSpan.FromSeconds(90));
+
+        Assert.Equal(RewardState.Working, _engine.GetStatus().State);
+    }
+
+    [Fact]
+    public async Task Held_time_is_reported_while_input_is_paused()
+    {
+        await RunAsync(TestRules.VsCodePath, TimeSpan.FromSeconds(5));
+        await PauseAsync(TestRules.VsCodePath, TimeSpan.FromSeconds(12));
+
+        Assert.Equal(ActivityStatus.Working, _tracker.Current.Status);
+        Assert.Equal(TimeSpan.FromSeconds(12), _tracker.Current.HeldWork);
     }
 
     [Fact]

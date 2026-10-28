@@ -16,7 +16,7 @@ Work 60 minutes in Visual Studio Code or Blockbench, earn 20 minutes with Steam 
 
 Reward states: **Working** → (work target reached) → **Reward ready** → (you click *Unlock*) → **Unlocked** → (reward time elapsed) → back to **Working** with progress reset.
 
-Only time that is genuinely in the foreground of an approved app, while you are active (default idle threshold 60 s), with the session unlocked and the PC awake, counts. Work to Unlock cannot tell whether the work is meaningful, and it never reads window titles, documents, keystrokes or screenshots.
+Only time that is genuinely in the foreground of an approved app, while you are active, with the session unlocked and the PC awake, counts. A pause without keyboard or mouse input (reading, thinking) is added when you continue within the idle threshold (default 60 s); if you step away for longer, none of that pause counts. Work to Unlock cannot tell whether the work is meaningful, and it never reads window titles, documents, keystrokes or screenshots.
 
 ## Install
 
