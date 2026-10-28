@@ -90,7 +90,7 @@ docs/                             Architecture, enforcement, testing, recovery, 
 
 ## Privacy
 
-Everything stays on your PC. The agent stores, per approved app, when qualifying work started and ended and how many milliseconds counted, plus reward history and an activity log of setting changes. It does not store window titles, document names, URLs, keystrokes or screenshots, and it makes no network connections. *Settings > Export local data* writes everything it has to a JSON file.
+Everything stays on your PC. The agent stores, per approved app, when qualifying work started and ended and how many milliseconds counted, plus reward history and an activity log of setting changes. It does not store window titles, document names, URLs, keystrokes or screenshots. The only network access is the update check: once a day (and when you choose *Check now*) the agent reads the latest release of [atcpybd/work-to-unlock](https://github.com/atcpybd/work-to-unlock/releases) from the GitHub API, sending nothing about you or your activity. Turn it off in *Settings > Updates*. *Update now* downloads the installer from that release, checks it against the release's `SHA256SUMS.txt`, and runs it; Windows asks for permission first. *Settings > Export local data* writes everything it has to a JSON file.
 
 ## Known limitations
 

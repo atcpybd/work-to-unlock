@@ -8,6 +8,7 @@ using WorkToUnlock.Core.Persistence;
 using WorkToUnlock.Core.Rewards;
 using WorkToUnlock.Core.Rules;
 using WorkToUnlock.Core.Tracking;
+using WorkToUnlock.Infrastructure;
 using WorkToUnlock.Infrastructure.Ipc;
 using WorkToUnlock.Infrastructure.Persistence;
 
@@ -23,6 +24,7 @@ public sealed class AgentService(IServiceProvider services, ILogger<AgentService
     private static readonly TimeSpan StatusInterval = TimeSpan.FromSeconds(1);
     private static readonly TimeSpan MaintenanceInterval = TimeSpan.FromHours(1);
     private static readonly TimeSpan ProgressInterval = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan UpdateCheckInterval = TimeSpan.FromMinutes(1);
 
     private PipeServer? _pipeServer;
 
@@ -175,10 +177,12 @@ public sealed class AgentService(IServiceProvider services, ILogger<AgentService
 
         var progress = services.GetRequiredService<ProgressService>();
         var protection = services.GetRequiredService<ProtectionMonitor>();
+        var updates = services.GetRequiredService<UpdateService>();
         var statusCadence = new Cadence(StatusInterval);
         var maintenanceCadence = new Cadence(MaintenanceInterval);
         var progressCadence = new Cadence(ProgressInterval);
         var heartbeatCadence = new Cadence(ProtectionMonitor.HeartbeatInterval);
+        var updateCadence = new Cadence(UpdateCheckInterval);
         using var timer = new PeriodicTimer(SampleInterval);
         do
         {
@@ -230,6 +234,22 @@ public sealed class AgentService(IServiceProvider services, ILogger<AgentService
                     catch (Exception ex) when (ex is not OperationCanceledException)
                     {
                         logger.LogWarning(ex, "Heartbeat failed");
+                    }
+                }, cancellationToken);
+            }
+
+            // Isolated test instances never contact GitHub on their own.
+            if (updateCadence.IsDue(now) && AppPaths.InstanceName is null)
+            {
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await updates.CheckIfDueAsync(cancellationToken).ConfigureAwait(false);
+                    }
+                    catch (Exception ex) when (ex is not OperationCanceledException)
+                    {
+                        logger.LogWarning(ex, "Update check failed");
                     }
                 }, cancellationToken);
             }

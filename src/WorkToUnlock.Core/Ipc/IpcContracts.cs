@@ -65,6 +65,9 @@ public static class AgentMethods
     public const string DeleteProfile = "deleteProfile";
 
     public const string ApplyProfile = "applyProfile";
+
+    /// <summary>The last update check, or a new one when <see cref="UpdateCheckRequest.CheckNow"/> is set.</summary>
+    public const string GetUpdateInfo = "getUpdateInfo";
 }
 
 /// <summary>Events pushed by the agent to subscribed dashboards.</summary>
@@ -152,6 +155,8 @@ public sealed record PathRequest(string Path, RuleType RuleType);
 public sealed record ResetProgressRequest(string Reason);
 
 public sealed record ProfileRequest(string? Id = null, string? Name = null);
+
+public sealed record UpdateCheckRequest(bool CheckNow);
 
 public sealed record SetEnforcementRequest(bool Enabled, string Reason);
 

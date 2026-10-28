@@ -70,6 +70,9 @@ public sealed class NotificationService(ITrayPresenter tray, SettingsService set
         }
     }
 
+    public void NotifyUpdateAvailable(Core.Updates.UpdateInfo update) =>
+        Show($"update:{update.LatestVersion}", TimeSpan.Zero, $"Work to Unlock {update.LatestVersion} is available", "Open the dashboard and choose Update now to install it.");
+
     /// <summary>Called by the main loop: warns before an active reward ends, and when saved break time is full.</summary>
     public void CheckRewardCountdown(RewardStatus status)
     {

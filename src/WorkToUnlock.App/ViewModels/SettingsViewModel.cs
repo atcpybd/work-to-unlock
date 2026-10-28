@@ -97,6 +97,9 @@ public sealed partial class SettingsViewModel : ObservableObject
     public partial double BalanceCapMinutes { get; set; } = 60;
 
     [ObservableProperty]
+    public partial bool CheckForUpdates { get; set; } = true;
+
+    [ObservableProperty]
     public partial bool EnforcementEnabled { get; set; } = true;
 
     [ObservableProperty]
@@ -156,6 +159,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             PauseBreakWhileLocked = PauseBreakWhileLocked,
             RewardMode = (RewardMode)Math.Clamp(RewardModeIndex, 0, 1),
             BalanceCapMinutes = ToInt(BalanceCapMinutes),
+            CheckForUpdates = CheckForUpdates,
         };
 
         // Validate locally first for instant feedback; the agent validates again.
@@ -337,6 +341,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         PauseBreakWhileLocked = settings.PauseBreakWhileLocked;
         RewardModeIndex = (int)settings.RewardMode;
         BalanceCapMinutes = settings.BalanceCapMinutes;
+        CheckForUpdates = settings.CheckForUpdates;
         EnforcementEnabled = settings.EnforcementEnabled;
         HasChanges = false;
         _loading = false;
@@ -361,7 +366,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         if (!_loading && e.PropertyName is nameof(WorkRequirementMinutes) or nameof(RewardDurationMinutes) or nameof(IdleThresholdSeconds)
                 or nameof(GracefulCloseTimeoutSeconds) or nameof(DataRetentionDays) or nameof(DailyGoalMinutes) or nameof(EnforcementModeIndex) or nameof(ThemeIndex)
                 or nameof(StartWithWindows) or nameof(MinimizeToTray) or nameof(NotificationsEnabled) or nameof(PauseBreakWhileLocked)
-                or nameof(RewardModeIndex) or nameof(BalanceCapMinutes))
+                or nameof(RewardModeIndex) or nameof(BalanceCapMinutes) or nameof(CheckForUpdates))
         {
             HasChanges = true;
         }

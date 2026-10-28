@@ -223,11 +223,38 @@
                     </StackPanel>
                 </Border>
 
+                <!-- Updates -->
+                <Border Style="{StaticResource CardStyle}">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="Updates" AutomationProperties.HeadingLevel="Level2" />
+                        <Grid Style="{StaticResource SettingRowStyle}" BorderThickness="0">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="Check for updates" />
+                                <TextBlock Style="{StaticResource SecondaryTextStyle}" TextWrapping="Wrap" Text="Once a day, look for a newer version in the project's releases on GitHub (github.com/atcpybd/work-to-unlock). Nothing about you or your activity is sent." />
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1" MinWidth="0" IsOn="{x:Bind ViewModel.CheckForUpdates, Mode=TwoWay}" AutomationProperties.Name="Check for updates" />
+                        </Grid>
+                        <Grid Style="{StaticResource SettingRowStyle}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="{x:Bind Updates.StatusText, Mode=OneWay}" TextWrapping="Wrap" />
+                                <TextBlock Style="{StaticResource SecondaryTextStyle}" Text="{x:Bind Updates.ProgressText, Mode=OneWay}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                                <Button Content="Release notes" Command="{x:Bind Updates.OpenReleaseNotesCommand}" />
+                                <Button Content="Check now" Command="{x:Bind Updates.CheckNowCommand}" />
+                                <Button Content="Update now" Style="{StaticResource AccentButtonStyle}" Command="{x:Bind Updates.InstallCommand}" Visibility="{x:Bind Updates.IsUpdateAvailable, Mode=OneWay}" />
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
                 <!-- Data -->
                 <Border Style="{StaticResource CardStyle}">
                     <StackPanel>
                         <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="Data and privacy" AutomationProperties.HeadingLevel="Level2" />
-                        <TextBlock Style="{StaticResource SecondaryTextStyle}" Text="Work to Unlock records which approved app was in the foreground and for how long. It never records keystrokes, window titles, document names or screenshots, and nothing leaves this PC." Margin="0,0,0,8" />
+                        <TextBlock Style="{StaticResource SecondaryTextStyle}" Text="Work to Unlock records which approved app was in the foreground and for how long. It never records keystrokes, window titles, document names or screenshots, and none of it leaves this PC." Margin="0,0,0,8" />
                         <Grid Style="{StaticResource SettingRowStyle}">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                             <StackPanel>

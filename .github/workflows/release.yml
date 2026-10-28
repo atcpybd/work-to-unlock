@@ -31,11 +31,11 @@ jobs:
           $version = if ('${{ github.event_name }}' -eq 'workflow_dispatch') { '${{ inputs.version }}' } else { '${{ github.ref_name }}'.TrimStart('v') }
           "value=$version" >> $env:GITHUB_OUTPUT
       - name: Build and test
+        # Integration tests run in the build workflow; a release only needs the unit tests to pass.
         run: |
-          dotnet build WorkToUnlock.sln -c Release
+          dotnet build WorkToUnlock.sln -c Release -p:Version=${{ steps.version.outputs.value }}
           dotnet test tests/WorkToUnlock.Core.Tests -c Release --no-build
           dotnet test tests/WorkToUnlock.Agent.Tests -c Release --no-build
-          dotnet test tests/WorkToUnlock.IntegrationTests -c Release --no-build
       - name: Publish and build installer
         shell: pwsh
         run: ./build/Publish.ps1 -Version ${{ steps.version.outputs.value }}
@@ -52,11 +52,14 @@ jobs:
             artifacts/installer/*.msi
             artifacts/*.zip
             artifacts/SHA256SUMS.txt
-      - name: GitHub release (draft)
+      # Published (not draft) so installed copies can find it: the app's update check reads the latest release
+      # and only installs an MSI whose hash is listed in SHA256SUMS.txt.
+      - name: GitHub release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          draft: true
+          draft: false
+          generate_release_notes: true
           files: |
             artifacts/installer/*.msi
             artifacts/*.zip

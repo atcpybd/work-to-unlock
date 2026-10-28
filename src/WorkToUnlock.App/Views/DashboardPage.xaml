@@ -26,6 +26,17 @@
             <TextBlock Text="Dashboard" Style="{StaticResource PageTitleStyle}" AutomationProperties.HeadingLevel="Level1" />
 
             <InfoBar
+                IsOpen="{x:Bind Updates.IsUpdateAvailable, Mode=OneWay}"
+                IsClosable="True"
+                Severity="Informational"
+                Title="{x:Bind Updates.Title, Mode=OneWay}"
+                Message="{x:Bind Updates.ProgressText, Mode=OneWay}">
+                <InfoBar.ActionButton>
+                    <Button Content="Update now" Command="{x:Bind Updates.InstallCommand}" />
+                </InfoBar.ActionButton>
+            </InfoBar>
+
+            <InfoBar
                 IsOpen="{x:Bind ViewModel.PersistenceWarning, Mode=OneWay}"
                 IsClosable="False"
                 Severity="Warning"

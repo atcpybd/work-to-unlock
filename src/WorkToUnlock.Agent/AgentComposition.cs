@@ -15,6 +15,7 @@ using WorkToUnlock.Enforcement.Processes;
 using WorkToUnlock.Enforcement.Strict;
 using WorkToUnlock.Infrastructure;
 using WorkToUnlock.Infrastructure.Persistence;
+using WorkToUnlock.Infrastructure.Updates;
 using WorkToUnlock.Infrastructure.Windows;
 
 namespace WorkToUnlock.Agent;
@@ -81,6 +82,8 @@ internal static class AgentComposition
         services.AddSingleton<AchievementService>();
         services.AddSingleton<BreakPauseService>();
         services.AddSingleton<ProfileService>();
+        services.AddSingleton<IReleaseClient, GitHubReleaseClient>();
+        services.AddSingleton<UpdateService>();
 
         // Tray and OS integration
         services.AddSingleton<AgentWindow>();

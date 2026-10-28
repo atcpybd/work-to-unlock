@@ -83,6 +83,7 @@ public partial class App : Application
         services.AddSingleton<StatisticsViewModel>();
         services.AddSingleton<SettingsViewModel>();
         services.AddSingleton<ProfilesViewModel>();
+        services.AddSingleton<UpdatesViewModel>();
         return services.BuildServiceProvider();
     }
 

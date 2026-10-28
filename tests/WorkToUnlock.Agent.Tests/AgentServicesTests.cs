@@ -55,7 +55,12 @@ internal sealed class AgentHarness : IDisposable
         Protection = new ProtectionMonitor(SettingsStore, Downtime, Settings, Audit, Clock, NullLogger<ProtectionMonitor>.Instance);
         Progress = new ProgressService(Statistics, Settings, Notifications, Clock, NullLogger<ProgressService>.Instance) { TimeZone = TimeZoneInfo.Utc };
         Profiles = new ProfileService(SettingsStore, Settings, Rules, Audit, NullLogger<ProfileService>.Instance);
+        Updates = new UpdateService(Releases, Settings, SettingsStore, Notifications, new AgentInfo(), Clock, NullLogger<UpdateService>.Instance);
     }
+
+    public FakeReleaseClient Releases { get; } = new();
+
+    public UpdateService Updates { get; }
 
     public ProfileService Profiles { get; }
 
@@ -83,7 +88,7 @@ internal sealed class AgentHarness : IDisposable
         var status = new AgentStatusService(Engine, tracker, Coordinator, Settings, info, Clock);
         var bridge = new DashboardBridge(hub ?? new AgentEventHub(), info, NullLogger<DashboardBridge>.Instance);
         var achievements = new AchievementService(Achievements, Statistics, Progress, Protection, Notifications, Clock, NullLogger<AchievementService>.Instance);
-        return new AgentRequestHandler(status, Engine, Rules, Settings, Discovery, Statistics, Audit, Strict, bridge, Progress, Protection, achievements, Profiles, TestRules.Folders, Clock, NullLogger<AgentRequestHandler>.Instance);
+        return new AgentRequestHandler(status, Engine, Rules, Settings, Discovery, Statistics, Audit, Strict, bridge, Progress, Protection, achievements, Profiles, Updates, TestRules.Folders, Clock, NullLogger<AgentRequestHandler>.Instance);
     }
 
     /// <summary>Waits for event-triggered reconciliations (they run on the thread pool).</summary>

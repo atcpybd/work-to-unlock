@@ -209,6 +209,20 @@ internal sealed class InMemoryAchievementStore : IAchievementStore
 
     public Task<bool> UnlockAsync(string id, DateTimeOffset unlockedUtc, CancellationToken cancellationToken) => Task.FromResult(Unlocked.TryAdd(id, unlockedUtc));
 }
+internal sealed class FakeReleaseClient : WorkToUnlock.Infrastructure.Updates.IReleaseClient
+{
+    public string? Json { get; set; }
+
+    public Exception? Failure { get; set; }
+
+    public int Calls { get; private set; }
+
+    public Task<string?> GetLatestReleaseJsonAsync(CancellationToken cancellationToken)
+    {
+        Calls++;
+        return Failure is null ? Task.FromResult(Json) : Task.FromException<string?>(Failure);
+    }
+}
 internal sealed class FakeDiscovery : IApplicationDiscovery
 {
     public Func<string, RuleType, ExecutableInspection> OnInspect { get; set; } = (path, _) => new ExecutableInspection
