@@ -166,23 +166,23 @@ internal sealed class InMemoryDowntimeStore : IDowntimeStore
 {
     public List<DowntimePeriod> Periods { get; } = [];
 
-    public Task AddAsync(string kind, DateTimeOffset startUtc, DateTimeOffset? endUtc, CancellationToken cancellationToken)
+    public Task AddAsync(DowntimePeriod period, CancellationToken cancellationToken)
     {
         lock (Periods)
         {
-            Periods.Add(new DowntimePeriod(kind, startUtc, endUtc));
+            Periods.Add(period);
         }
 
         return Task.CompletedTask;
     }
 
-    public Task CloseOpenAsync(string kind, DateTimeOffset endUtc, CancellationToken cancellationToken)
+    public Task CloseOpenAsync(string kind, long? ruleId, DateTimeOffset endUtc, CancellationToken cancellationToken)
     {
         lock (Periods)
         {
             for (var i = 0; i < Periods.Count; i++)
             {
-                if (Periods[i].Kind == kind && Periods[i].EndUtc is null)
+                if (Periods[i].Kind == kind && Periods[i].EndUtc is null && (ruleId is null || Periods[i].RuleId == ruleId))
                 {
                     Periods[i] = Periods[i] with { EndUtc = endUtc };
                 }

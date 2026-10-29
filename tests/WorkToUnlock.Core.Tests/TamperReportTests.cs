@@ -58,6 +58,26 @@ public sealed class TamperReportTests
     }
 
     [Fact]
+    public void Allowed_and_removed_restricted_apps_are_reported_by_name()
+    {
+        DowntimePeriod[] periods =
+        [
+            new(DowntimeKinds.AppAllowed, Now.AddHours(-10), Now.AddHours(-8), 2, "Steam"),
+            new(DowntimeKinds.AppAllowed, Now.AddHours(-1), null, 3, "Discord"),
+            new(DowntimeKinds.AppUnrestricted, Now.AddHours(-5), Now.AddHours(-5), 4, "Game"),
+        ];
+
+        var report = TamperReportCalculator.Compute(periods, Now, days: 7);
+
+        Assert.False(report.IsClean);
+        Assert.Equal(2, report.TimesAppsAllowed);
+        Assert.Equal(TimeSpan.FromHours(3), report.TimeAppsAllowed);
+        Assert.Equal(["Discord"], report.AppsAllowedNow);
+        Assert.Equal(1, report.AppsUnrestricted);
+        Assert.Equal("Discord", report.Incidents[0].Subject);
+    }
+
+    [Fact]
     public void Periods_entirely_before_the_window_are_ignored()
     {
         var report = TamperReportCalculator.Compute([Period(DowntimeKinds.AgentNotRunning, 24 * 20, 24 * 19)], Now, days: 7);

@@ -235,16 +235,23 @@ public sealed class SqlitePersistenceTests : IAsyncLifetime
     {
         var store = new SqliteDowntimeStore(_database);
         var now = new DateTimeOffset(2026, 3, 4, 15, 0, 0, TimeSpan.Zero);
-        await store.AddAsync(DowntimeKinds.AgentNotRunning, now.AddDays(-20), now.AddDays(-20).AddHours(1), CancellationToken.None);
-        await store.AddAsync(DowntimeKinds.AgentNotRunning, now.AddHours(-3), now.AddHours(-2), CancellationToken.None);
-        await store.AddAsync(DowntimeKinds.EnforcementDisabled, now.AddHours(-1), null, CancellationToken.None);
+        await store.AddAsync(new(DowntimeKinds.AgentNotRunning, now.AddDays(-20), now.AddDays(-20).AddHours(1)), CancellationToken.None);
+        await store.AddAsync(new(DowntimeKinds.AgentNotRunning, now.AddHours(-3), now.AddHours(-2)), CancellationToken.None);
+        await store.AddAsync(new(DowntimeKinds.EnforcementDisabled, now.AddHours(-1), null), CancellationToken.None);
+        await store.AddAsync(new(DowntimeKinds.AppAllowed, now.AddHours(-1), null, 7, "Steam"), CancellationToken.None);
+        await store.AddAsync(new(DowntimeKinds.AppAllowed, now.AddHours(-1), null, 8, "Discord"), CancellationToken.None);
 
-        Assert.Equal(2, (await store.GetSinceAsync(now.AddDays(-7), CancellationToken.None)).Count);
-        await store.CloseOpenAsync(DowntimeKinds.EnforcementDisabled, now, CancellationToken.None);
+        Assert.Equal(4, (await store.GetSinceAsync(now.AddDays(-7), CancellationToken.None)).Count);
+        await store.CloseOpenAsync(DowntimeKinds.EnforcementDisabled, null, now, CancellationToken.None);
+        await store.CloseOpenAsync(DowntimeKinds.AppAllowed, 7, now, CancellationToken.None);
 
         var periods = await store.GetSinceAsync(now.AddDays(-7), CancellationToken.None);
         Assert.Equal(now, periods.Single(p => p.Kind == DowntimeKinds.EnforcementDisabled).EndUtc);
-        Assert.Empty(await store.GetSinceAsync(now.AddMinutes(1), CancellationToken.None));
+        Assert.Equal(now, periods.Single(p => p.RuleId == 7).EndUtc);
+        var discord = periods.Single(p => p.RuleId == 8);
+        Assert.Null(discord.EndUtc);
+        Assert.Equal("Discord", discord.Subject);
+        Assert.Equal([8L], (await store.GetSinceAsync(now.AddMinutes(1), CancellationToken.None)).Select(p => p.RuleId!.Value));
     }
 
     [Fact]

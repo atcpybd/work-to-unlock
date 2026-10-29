@@ -46,23 +46,27 @@ public sealed class SqliteAchievementStore(SqliteDatabase database) : IAchieveme
 
 public sealed class SqliteDowntimeStore(SqliteDatabase database) : IDowntimeStore
 {
-    public async Task AddAsync(string kind, DateTimeOffset startUtc, DateTimeOffset? endUtc, CancellationToken cancellationToken)
+    public async Task AddAsync(DowntimePeriod period, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(period);
         await using var connection = await database.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
         await using var command = connection.CreateCommand();
-        command.CommandText = "INSERT INTO Downtime (Kind, StartUtc, EndUtc) VALUES ($kind, $start, $end);";
-        command.Parameters.AddWithValue("$kind", kind);
-        command.Parameters.AddWithValue("$start", Db.ToUnix(startUtc));
-        command.Parameters.AddWithValue("$end", Db.ToDb(endUtc));
+        command.CommandText = "INSERT INTO Downtime (Kind, StartUtc, EndUtc, RuleId, Subject) VALUES ($kind, $start, $end, $rule, $subject);";
+        command.Parameters.AddWithValue("$kind", period.Kind);
+        command.Parameters.AddWithValue("$start", Db.ToUnix(period.StartUtc));
+        command.Parameters.AddWithValue("$end", Db.ToDb(period.EndUtc));
+        command.Parameters.AddWithValue("$rule", (object?)period.RuleId ?? DBNull.Value);
+        command.Parameters.AddWithValue("$subject", Db.ToDb(period.Subject));
         await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
     }
 
-    public async Task CloseOpenAsync(string kind, DateTimeOffset endUtc, CancellationToken cancellationToken)
+    public async Task CloseOpenAsync(string kind, long? ruleId, DateTimeOffset endUtc, CancellationToken cancellationToken)
     {
         await using var connection = await database.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
         await using var command = connection.CreateCommand();
-        command.CommandText = "UPDATE Downtime SET EndUtc = $end WHERE Kind = $kind AND EndUtc IS NULL;";
+        command.CommandText = "UPDATE Downtime SET EndUtc = $end WHERE Kind = $kind AND EndUtc IS NULL AND ($rule IS NULL OR RuleId = $rule);";
         command.Parameters.AddWithValue("$kind", kind);
+        command.Parameters.AddWithValue("$rule", (object?)ruleId ?? DBNull.Value);
         command.Parameters.AddWithValue("$end", Db.ToUnix(endUtc));
         await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
     }
@@ -71,13 +75,18 @@ public sealed class SqliteDowntimeStore(SqliteDatabase database) : IDowntimeStor
     {
         await using var connection = await database.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
         await using var command = connection.CreateCommand();
-        command.CommandText = "SELECT Kind, StartUtc, EndUtc FROM Downtime WHERE EndUtc IS NULL OR EndUtc >= $since ORDER BY StartUtc;";
+        command.CommandText = "SELECT Kind, StartUtc, EndUtc, RuleId, Subject FROM Downtime WHERE EndUtc IS NULL OR EndUtc >= $since ORDER BY StartUtc;";
         command.Parameters.AddWithValue("$since", Db.ToUnix(sinceUtc));
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         var periods = new List<DowntimePeriod>();
         while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
         {
-            periods.Add(new DowntimePeriod(reader.GetString(0), Db.FromUnix(reader.GetInt64(1)), reader.GetNullableTime(2)));
+            periods.Add(new DowntimePeriod(
+                reader.GetString(0),
+                Db.FromUnix(reader.GetInt64(1)),
+                reader.GetNullableTime(2),
+                reader.IsDBNull(3) ? null : reader.GetInt64(3),
+                reader.GetNullableString(4)));
         }
 
         return periods;

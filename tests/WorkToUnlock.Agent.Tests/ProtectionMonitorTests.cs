@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using WorkToUnlock.Agent.Services;
+using WorkToUnlock.Core.Domain;
 using WorkToUnlock.Core.Persistence;
 
 namespace WorkToUnlock.Agent.Tests;
@@ -12,11 +13,12 @@ public sealed class ProtectionMonitorTests : IDisposable
 
     /// <summary>A new agent process over the same stored data.</summary>
     private ProtectionMonitor Restart() =>
-        new(_h.SettingsStore, _h.Downtime, _h.Settings, _h.Audit, _h.Clock, NullLogger<ProtectionMonitor>.Instance);
+        new(_h.SettingsStore, _h.Downtime, _h.Settings, _h.Rules, _h.Audit, _h.Clock, NullLogger<ProtectionMonitor>.Instance);
 
     private async Task<ProtectionMonitor> StartAsync()
     {
         await _h.Settings.LoadAsync(CancellationToken.None);
+        await _h.Rules.LoadAsync(CancellationToken.None);
         await _h.Protection.StartAsync(CancellationToken.None);
         return _h.Protection;
     }
@@ -133,5 +135,85 @@ public sealed class ProtectionMonitorTests : IDisposable
         var period = Assert.Single(_h.Downtime.Periods);
         Assert.Null(period.EndUtc);
         Assert.True((await monitor.GetReportAsync(CancellationToken.None)).EnforcementDisabledNow);
+    }
+
+    private ApplicationRule Steam => _h.Rules.Rules.Single(r => r.Name == "Steam");
+
+    [Fact]
+    public async Task Turning_a_restricted_app_off_and_on_records_the_period_and_the_log()
+    {
+        var monitor = await StartAsync();
+
+        await _h.Rules.SaveAsync(Steam with { Enabled = false }, CancellationToken.None);
+        await monitor.LastSync;
+        _h.Clock.Advance(TimeSpan.FromMinutes(40));
+        await _h.Rules.SaveAsync(Steam with { Enabled = true }, CancellationToken.None);
+        await monitor.LastSync;
+
+        var period = Assert.Single(_h.Downtime.Periods);
+        Assert.Equal(DowntimeKinds.AppAllowed, period.Kind);
+        Assert.Equal("Steam", period.Subject);
+        Assert.Equal(TimeSpan.FromMinutes(40), period.EndUtc - period.StartUtc);
+        Assert.Contains(_h.Audit.Events, e => e.EventType == "RestrictedAppAllowed" && e.Description.Contains("Steam", StringComparison.Ordinal));
+        Assert.Contains(_h.Audit.Events, e => e.EventType == "RestrictedAppBlocked");
+
+        var report = await monitor.GetReportAsync(CancellationToken.None);
+        Assert.Equal(1, report.TimesAppsAllowed);
+        Assert.False(report.IsClean);
+    }
+
+    [Fact]
+    public async Task Removing_a_restricted_app_is_recorded_as_a_moment()
+    {
+        var monitor = await StartAsync();
+
+        await _h.Rules.DeleteAsync(Steam.Id, CancellationToken.None);
+        await monitor.LastSync;
+
+        var removed = Assert.Single(_h.Downtime.Periods);
+        Assert.Equal(DowntimeKinds.AppUnrestricted, removed.Kind);
+        Assert.Equal(removed.StartUtc, removed.EndUtc);
+        Assert.Contains(_h.Audit.Events, e => e.EventType == "RestrictedAppRemoved");
+    }
+
+    [Fact]
+    public async Task Changing_a_restricted_app_into_a_work_app_counts_as_removing_it()
+    {
+        var monitor = await StartAsync();
+
+        await _h.Rules.SaveAsync(Steam with { RuleType = RuleType.Work }, CancellationToken.None);
+        await monitor.LastSync;
+
+        Assert.Equal(DowntimeKinds.AppUnrestricted, Assert.Single(_h.Downtime.Periods).Kind);
+    }
+
+    [Fact]
+    public async Task An_app_left_off_across_restarts_stays_one_open_period_and_is_closed_once_restricted_again()
+    {
+        var monitor = await StartAsync();
+        await _h.Rules.SaveAsync(Steam with { Enabled = false }, CancellationToken.None);
+        await monitor.LastSync;
+
+        _h.Clock.Advance(TimeSpan.FromMinutes(1));
+        var restarted = Restart();
+        await restarted.StartAsync(CancellationToken.None);
+        Assert.Null(Assert.Single(_h.Downtime.Periods).EndUtc);
+
+        await _h.Rules.SaveAsync(Steam with { Enabled = true }, CancellationToken.None);
+        await restarted.LastSync;
+        Assert.NotNull(Assert.Single(_h.Downtime.Periods).EndUtc);
+    }
+
+    [Fact]
+    public async Task Apps_already_off_when_upgrading_are_counted_from_that_start()
+    {
+        await _h.RuleStore.SaveAsync(TestRules.Restricted(2, "Steam", TestRules.SteamPath) with { Enabled = false }, CancellationToken.None);
+
+        await StartAsync();
+
+        var period = Assert.Single(_h.Downtime.Periods);
+        Assert.Equal(DowntimeKinds.AppAllowed, period.Kind);
+        Assert.Equal(_h.Clock.UtcNow, period.StartUtc);
+        Assert.DoesNotContain(_h.Audit.Events, e => e.EventType == "RestrictedAppAllowed");
     }
 }

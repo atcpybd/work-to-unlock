@@ -2,19 +2,22 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using WorkToUnlock.Core.Domain;
 using WorkToUnlock.Core.Persistence;
+using WorkToUnlock.Core.Rules;
 using WorkToUnlock.Core.Time;
 
 namespace WorkToUnlock.Agent.Services;
 
 /// <summary>
 /// Records when restrictions were not protecting the user, for the honesty report: the agent ended while Windows kept
-/// running (closed, ended from Task Manager, or crashed), or enforcement was turned off. A heartbeat is stored every
-/// <see cref="HeartbeatInterval"/>; at start the previous run's last heartbeat shows how and when it ended.
+/// running (closed, ended from Task Manager, or crashed), enforcement was turned off, or a restricted app was turned
+/// off or stopped being restricted. A heartbeat is stored every <see cref="HeartbeatInterval"/>; at start the
+/// previous run's last heartbeat shows how and when it ended.
 /// </summary>
 public sealed class ProtectionMonitor(
     ISettingsStore values,
     IDowntimeStore downtime,
     SettingsService settings,
+    IRuleCatalog rules,
     IAuditLog audit,
     IClock clock,
     ILogger<ProtectionMonitor> logger)
@@ -38,8 +41,9 @@ public sealed class ProtectionMonitor(
     private readonly Lock _syncLock = new();
     private string? _exitReason;
     private bool? _enforcementEnabled;
+    private Dictionary<long, (string Name, bool Enabled)>? _restricted;
 
-    /// <summary>The most recent enforcement-change write (tests await it).</summary>
+    /// <summary>The most recent enforcement or app-rule write (tests await it).</summary>
     internal Task LastSync { get; private set; } = Task.CompletedTask;
 
     public async Task StartAsync(CancellationToken cancellationToken)
@@ -49,7 +53,7 @@ public sealed class ProtectionMonitor(
         if (previous is not null && WasUnprotected(previous, now, out var since))
         {
             var gap = now - since;
-            await downtime.AddAsync(DowntimeKinds.AgentNotRunning, since, now, cancellationToken).ConfigureAwait(false);
+            await downtime.AddAsync(new DowntimePeriod(DowntimeKinds.AgentNotRunning, since, now), cancellationToken).ConfigureAwait(false);
             await audit.WriteAsync(
                 "AgentNotRunning",
                 previous.Exit is null
@@ -62,7 +66,9 @@ public sealed class ProtectionMonitor(
 
         await WriteHeartbeatAsync(null, cancellationToken).ConfigureAwait(false);
         await SyncEnforcementAsync(settings.Current.EnforcementEnabled, cancellationToken).ConfigureAwait(false);
-        settings.Changed += (_, current) => QueueEnforcementSync(current.EnforcementEnabled);
+        await SyncRulesAsync(cancellationToken).ConfigureAwait(false);
+        settings.Changed += (_, current) => Queue(() => SyncEnforcementAsync(current.EnforcementEnabled, CancellationToken.None));
+        rules.Changed += (_, _) => Queue(() => SyncRulesAsync(CancellationToken.None));
     }
 
     /// <summary>Called on the heartbeat cadence.</summary>
@@ -110,7 +116,8 @@ public sealed class ProtectionMonitor(
         return sameBoot && previous.Exit != ExitSessionEnding && now - since > Tolerance;
     }
 
-    private void QueueEnforcementSync(bool enabled)
+    /// <summary>Runs a write after the previous one, off the thread that raised the change.</summary>
+    private void Queue(Func<Task> write)
     {
         lock (_syncLock)
         {
@@ -120,13 +127,75 @@ public sealed class ProtectionMonitor(
                 await previous.ConfigureAwait(false);
                 try
                 {
-                    await SyncEnforcementAsync(enabled, CancellationToken.None).ConfigureAwait(false);
+                    await write().ConfigureAwait(false);
                 }
                 catch (Exception ex)
                 {
-                    logger.LogWarning(ex, "Could not record the enforcement change");
+                    logger.LogWarning(ex, "Could not record a protection change");
                 }
             });
+        }
+    }
+
+    /// <summary>
+    /// Opens a period while a restricted app is turned off and closes it when it is turned back on. Removing a
+    /// restricted app, or changing it to another type, is recorded as a moment. The first call reconciles with the
+    /// periods stored before this start.
+    /// </summary>
+    private async Task SyncRulesAsync(CancellationToken cancellationToken)
+    {
+        var now = clock.UtcNow;
+        var current = rules.Rules.Where(r => r.RuleType == RuleType.Restricted).ToDictionary(r => r.Id, r => (r.Name, r.Enabled));
+
+        if (_restricted is null)
+        {
+            var open = (await downtime.GetSinceAsync(now, cancellationToken).ConfigureAwait(false))
+                .Where(p => p.Kind == DowntimeKinds.AppAllowed && p.EndUtc is null && p.RuleId is not null)
+                .ToList();
+            foreach (var period in open.Where(p => !(current.TryGetValue(p.RuleId!.Value, out var rule) && !rule.Enabled)))
+            {
+                await downtime.CloseOpenAsync(DowntimeKinds.AppAllowed, period.RuleId, now, cancellationToken).ConfigureAwait(false);
+            }
+
+            foreach (var (id, rule) in current.Where(r => !r.Value.Enabled && open.All(p => p.RuleId != r.Key)))
+            {
+                await downtime.AddAsync(new DowntimePeriod(DowntimeKinds.AppAllowed, now, null, id, rule.Name), cancellationToken).ConfigureAwait(false);
+            }
+
+            _restricted = current;
+            return;
+        }
+
+        foreach (var (id, before) in _restricted)
+        {
+            if (!current.TryGetValue(id, out var after))
+            {
+                await downtime.CloseOpenAsync(DowntimeKinds.AppAllowed, id, now, cancellationToken).ConfigureAwait(false);
+                await downtime.AddAsync(new DowntimePeriod(DowntimeKinds.AppUnrestricted, now, now, id, before.Name), cancellationToken).ConfigureAwait(false);
+                await audit.WriteAsync("RestrictedAppRemoved", $"'{before.Name}' is no longer a restricted app.", "Warning", cancellationToken).ConfigureAwait(false);
+            }
+            else if (before.Enabled && !after.Enabled)
+            {
+                await AllowAsync(id, after.Name).ConfigureAwait(false);
+            }
+            else if (!before.Enabled && after.Enabled)
+            {
+                await downtime.CloseOpenAsync(DowntimeKinds.AppAllowed, id, now, cancellationToken).ConfigureAwait(false);
+                await audit.WriteAsync("RestrictedAppBlocked", $"'{after.Name}' is restricted again.", "Success", cancellationToken).ConfigureAwait(false);
+            }
+        }
+
+        foreach (var (id, added) in current.Where(r => !_restricted.ContainsKey(r.Key) && !r.Value.Enabled))
+        {
+            await AllowAsync(id, added.Name).ConfigureAwait(false);
+        }
+
+        _restricted = current;
+
+        async Task AllowAsync(long id, string name)
+        {
+            await downtime.AddAsync(new DowntimePeriod(DowntimeKinds.AppAllowed, now, null, id, name), cancellationToken).ConfigureAwait(false);
+            await audit.WriteAsync("RestrictedAppAllowed", $"'{name}' was turned off and can run at any time.", "Warning", cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -141,14 +210,14 @@ public sealed class ProtectionMonitor(
         var now = clock.UtcNow;
         if (enabled)
         {
-            await downtime.CloseOpenAsync(DowntimeKinds.EnforcementDisabled, now, cancellationToken).ConfigureAwait(false);
+            await downtime.CloseOpenAsync(DowntimeKinds.EnforcementDisabled, null, now, cancellationToken).ConfigureAwait(false);
         }
         else
         {
             var open = await downtime.GetSinceAsync(now, cancellationToken).ConfigureAwait(false);
             if (!open.Any(p => p.Kind == DowntimeKinds.EnforcementDisabled && p.EndUtc is null))
             {
-                await downtime.AddAsync(DowntimeKinds.EnforcementDisabled, now, null, cancellationToken).ConfigureAwait(false);
+                await downtime.AddAsync(new DowntimePeriod(DowntimeKinds.EnforcementDisabled, now, null), cancellationToken).ConfigureAwait(false);
             }
         }
 

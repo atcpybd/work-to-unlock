@@ -115,10 +115,10 @@ public sealed class AgentService(IServiceProvider services, ILogger<AgentService
         // 2. Settings, rules and reward state.
         var settings = services.GetRequiredService<SettingsService>();
         await settings.LoadAsync(cancellationToken).ConfigureAwait(false);
-        await services.GetRequiredService<ProtectionMonitor>().StartAsync(cancellationToken).ConfigureAwait(false);
         var rules = services.GetRequiredService<IRuleCatalog>();
         await rules.LoadAsync(cancellationToken).ConfigureAwait(false);
         await services.GetRequiredService<DefaultRulesSeeder>().SeedIfFirstRunAsync(cancellationToken).ConfigureAwait(false);
+        await services.GetRequiredService<ProtectionMonitor>().StartAsync(cancellationToken).ConfigureAwait(false);
 
         var engine = services.GetRequiredService<IRewardEngine>();
         await engine.InitializeAsync(RewardSettings.From(settings.Current), cancellationToken).ConfigureAwait(false);

@@ -88,6 +88,15 @@ public sealed partial class StatisticsViewModel : ObservableObject
     public partial bool EnforcementOffNow { get; set; }
 
     [ObservableProperty]
+    public partial string AppsAllowedText { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasAppsAllowedNow))]
+    public partial string? AppsAllowedNowText { get; set; }
+
+    public bool HasAppsAllowedNow => AppsAllowedNowText is not null;
+
+    [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasError))]
     public partial string? ErrorText { get; set; }
 
@@ -194,7 +203,7 @@ public sealed partial class StatisticsViewModel : ObservableObject
         static string Times(int count) => count == 1 ? "once" : $"{count} times";
 
         HonestyIsClean = report.IsClean;
-        var incidents = report.UnexpectedStops + report.TimesEnforcementDisabled;
+        var incidents = report.UnexpectedStops + report.TimesEnforcementDisabled + report.TimesAppsAllowed + report.AppsUnrestricted;
         HonestyHeadline = report.IsClean
             ? $"Protected for the last {report.Days} days"
             : $"Unprotected {Times(incidents)} in the last {report.Days} days";
@@ -205,6 +214,16 @@ public sealed partial class StatisticsViewModel : ObservableObject
             ? "Enforcement stayed on"
             : $"Enforcement turned off {Times(report.TimesEnforcementDisabled)} · {Format.Duration(report.TimeEnforcementDisabled)} in total";
         EnforcementOffNow = report.EnforcementDisabledNow;
+        AppsAllowedText = (report.TimesAppsAllowed, report.AppsUnrestricted) switch
+        {
+            (0, 0) => "Every restricted app stayed blocked",
+            (var allowed, 0) => $"Restricted apps turned off {Times(allowed)} · {Format.Duration(report.TimeAppsAllowed)} in total",
+            (0, var removed) => $"{(removed == 1 ? "A restricted app was" : $"{removed} restricted apps were")} removed",
+            var (allowed, removed) => $"Restricted apps turned off {Times(allowed)} · {Format.Duration(report.TimeAppsAllowed)} · {removed} removed",
+        };
+        AppsAllowedNowText = report.AppsAllowedNow.Count == 0
+            ? null
+            : $"{string.Join(", ", report.AppsAllowedNow)} {(report.AppsAllowedNow.Count == 1 ? "is" : "are")} turned off right now and can run at any time. Turn {(report.AppsAllowedNow.Count == 1 ? "it" : "them")} back on in Applications.";
 
         Incidents.Clear();
         foreach (var incident in report.Incidents.Take(MaxIncidents))
@@ -212,8 +231,15 @@ public sealed partial class StatisticsViewModel : ObservableObject
             var local = incident.StartUtc.ToLocalTime();
             Incidents.Add(new IncidentViewModel(
                 $"{local.ToString("ddd d MMM", CultureInfo.CurrentCulture)}, {local.ToString("t", CultureInfo.CurrentCulture)}",
-                incident.Kind == DowntimeKinds.AgentNotRunning ? "Not running" : "Enforcement off",
-                incident.EndUtc is null ? $"{Format.Duration(incident.Duration)} so far" : Format.Duration(incident.Duration)));
+                incident.Kind switch
+                {
+                    DowntimeKinds.AgentNotRunning => "Not running",
+                    DowntimeKinds.AppAllowed => $"{incident.Subject ?? "An app"} allowed",
+                    DowntimeKinds.AppUnrestricted => $"{incident.Subject ?? "An app"} no longer restricted",
+                    _ => "Enforcement off",
+                },
+                incident.Kind == DowntimeKinds.AppUnrestricted ? string.Empty
+                    : incident.EndUtc is null ? $"{Format.Duration(incident.Duration)} so far" : Format.Duration(incident.Duration)));
         }
     }
 }

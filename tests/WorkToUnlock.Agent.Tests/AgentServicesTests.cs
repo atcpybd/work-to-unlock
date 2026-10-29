@@ -52,7 +52,7 @@ internal sealed class AgentHarness : IDisposable
         Settings = new SettingsService(SettingsStore, Audit, NullLogger<SettingsService>.Instance);
         Coordinator = new EnforcementCoordinator(Enforcer, Strict, Engine, Rules, Settings, NullLogger<EnforcementCoordinator>.Instance);
         Notifications = new NotificationService(Tray, Settings, Engine, Clock);
-        Protection = new ProtectionMonitor(SettingsStore, Downtime, Settings, Audit, Clock, NullLogger<ProtectionMonitor>.Instance);
+        Protection = new ProtectionMonitor(SettingsStore, Downtime, Settings, Rules, Audit, Clock, NullLogger<ProtectionMonitor>.Instance);
         Progress = new ProgressService(Statistics, Settings, Notifications, Clock, NullLogger<ProgressService>.Instance) { TimeZone = TimeZoneInfo.Utc };
         Profiles = new ProfileService(SettingsStore, Settings, Rules, Audit, NullLogger<ProfileService>.Instance);
         Updates = new UpdateService(Releases, Settings, SettingsStore, Notifications, new AgentInfo(), Clock, NullLogger<UpdateService>.Instance);

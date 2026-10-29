@@ -102,17 +102,25 @@ public static class DowntimeKinds
 
     /// <summary>The user turned enforcement off.</summary>
     public const string EnforcementDisabled = "EnforcementDisabled";
+
+    /// <summary>A restricted app was turned off (on the Applications page or by a profile), so it could run.</summary>
+    public const string AppAllowed = "AppAllowed";
+
+    /// <summary>A restricted app was removed or changed to another type. A moment, not a period.</summary>
+    public const string AppUnrestricted = "AppUnrestricted";
 }
 
-public sealed record DowntimePeriod(string Kind, DateTimeOffset StartUtc, DateTimeOffset? EndUtc);
+/// <param name="RuleId">The restricted app concerned, for <see cref="DowntimeKinds.AppAllowed"/> and <see cref="DowntimeKinds.AppUnrestricted"/>.</param>
+/// <param name="Subject">Its name when the period started.</param>
+public sealed record DowntimePeriod(string Kind, DateTimeOffset StartUtc, DateTimeOffset? EndUtc, long? RuleId = null, string? Subject = null);
 
 /// <summary>Periods when restrictions were not protecting the user, for the tamper report.</summary>
 public interface IDowntimeStore
 {
-    Task AddAsync(string kind, DateTimeOffset startUtc, DateTimeOffset? endUtc, CancellationToken cancellationToken);
+    Task AddAsync(DowntimePeriod period, CancellationToken cancellationToken);
 
-    /// <summary>Closes the open period of this kind, if any.</summary>
-    Task CloseOpenAsync(string kind, DateTimeOffset endUtc, CancellationToken cancellationToken);
+    /// <summary>Closes the open periods of this kind (for this app only, when <paramref name="ruleId"/> is set).</summary>
+    Task CloseOpenAsync(string kind, long? ruleId, DateTimeOffset endUtc, CancellationToken cancellationToken);
 
     Task<IReadOnlyList<DowntimePeriod>> GetSinceAsync(DateTimeOffset sinceUtc, CancellationToken cancellationToken);
 }

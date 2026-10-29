@@ -102,6 +102,12 @@ internal static class Migrations
         ALTER TABLE RewardState ADD COLUMN PausedRemainingMilliseconds INTEGER NULL;
         ALTER TABLE RewardState ADD COLUMN PausedUtc INTEGER NULL;
         """,
+
+        // 3: which restricted app a downtime period is about (turned off, or no longer restricted).
+        """
+        ALTER TABLE Downtime ADD COLUMN RuleId INTEGER NULL;
+        ALTER TABLE Downtime ADD COLUMN Subject TEXT NULL;
+        """,
     ];
 
     public static int Latest => Scripts.Length;
