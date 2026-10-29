@@ -84,6 +84,12 @@ Database version 2 adds `BlockedAttempts`, `Achievements`, `Downtime` and the re
 - ✅ Update check against this repository's latest GitHub release; *Update now* verifies the MSI against `SHA256SUMS.txt` before running it
 - 🔲 *Update now* end to end from one published release to the next (needs two releases)
 
+## 1.1.1 ✅
+
+- ✅ Turning a restricted app off (Applications page or a profile), back on, or removing it is recorded in the activity log and the honesty report. Database version 3 adds the app to downtime records.
+- ✅ Dashboards running elevated (UAC off, "Run as administrator", GitHub's Windows runners) can connect: the client checks the pipe owner against the user SID instead of the token's default owner.
+- ✅ Motion: staggered card entrance, direction-aware page slides, a smoothly sweeping progress ring, pulse/breathe/hover/grow-in effects, and confetti for an earned reward or the daily goal. All custom motion follows Windows' *Animation effects* setting.
+
 ## Remaining work and ideas
 
 - Code-sign the binaries and the MSI. Unsigned builds trigger SmartScreen, and signing lets strict mode use publisher rules.
@@ -91,4 +97,4 @@ Database version 2 adds `BlockedAttempts`, `Achievements`, `Downtime` and the re
 - Optional Start-menu-shortcut scanning (`.lnk`) to find more installed apps.
 - Localization; all strings are currently English.
 - Choose and add a license. `installer/WorkToUnlock.Installer/License.rtf` is a neutral placeholder notice. The repository is public, but without a license others may read the code and not reuse it.
-- Record turning a restricted app off on the Applications page in the activity log and the honesty report.
+

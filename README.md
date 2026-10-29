@@ -27,8 +27,9 @@ Only time that is genuinely in the foreground of an approved app, while you are 
 - **Daily goal and streaks**: a daily work goal, the current and best streak, and a 14-day chart.
 - **Achievements**: twelve milestones for total work, focused days, streaks, rewards and a clean week.
 - **Blocked attempts**: how often you tried to open a locked app today, per app.
-- **Honesty report**: the last 7 days of time when locked apps were not being blocked, because Work to Unlock was closed or ended from Task Manager, or enforcement was turned off. Signing out and shutting down don't count.
+- **Honesty report**: the last 7 days of time when locked apps were not being blocked: Work to Unlock closed or ended from Task Manager, enforcement turned off, or a restricted app turned off (on the Applications page or by a profile) or removed. Signing out and shutting down don't count. Each change is also in the activity log.
 - **Updates**: a daily check of this repository's releases, and *Update now* to install a newer version.
+- **Motion**: the progress ring sweeps and fills, cards rise in, the live activity dot pulses, and earning a break or reaching your daily goal plays confetti. Turning off *Animation effects* in Windows settings turns these off.
 
 ## Install
 
@@ -64,7 +65,7 @@ dotnet test tests/WorkToUnlock.IntegrationTests
 ```
 
 ```bash
-pwsh ./build/Publish.ps1 -Version 1.1.0
+pwsh ./build/Publish.ps1 -Version 1.1.1
 ```
 
 `Publish.ps1` writes a self-contained app folder to `artifacts/publish/win-x64`, a portable zip to `artifacts/`, and the MSI to `artifacts/installer/`. On Linux, use `WorkToUnlock.Portable.slnf`.
@@ -110,7 +111,7 @@ Everything stays on your PC. The agent stores, per approved app, when qualifying
 - Strict mode is unavailable on Windows Home and Pro, which do not enforce local AppLocker policies.
 - A restricted app started with administrator rights cannot be closed by the agent; the dashboard reports this as *Partly protected*.
 - Notifications are tray balloon notifications from the agent; they respect Focus Assist / Do Not Disturb.
-- The honesty report can't see time before a restart of Windows: if the agent is ended and the PC is then restarted, that gap isn't reported. Allowing a restricted app, by turning it off on the Applications page or switching to a profile that allows it, isn't counted either (profile switches do appear in the activity log).
+- The honesty report can't see time before a restart of Windows: if the agent is ended and the PC is then restarted, that gap isn't reported.
 - Achievements and streaks use the stored history, which data retention limits (90 days by default); achievements stay unlocked once earned.
 
 See [docs/implementation-plan.md](docs/implementation-plan.md) for what was verified on real Windows and what still needs manual testing.
