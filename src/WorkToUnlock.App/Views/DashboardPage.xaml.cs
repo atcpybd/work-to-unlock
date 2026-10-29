@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Navigation;
+using WorkToUnlock.App.Controls;
 using WorkToUnlock.App.Services;
 using WorkToUnlock.App.ViewModels;
 using WorkToUnlock.Core.Domain;
@@ -31,6 +32,8 @@ public sealed partial class DashboardPage : Page
     protected override async void OnNavigatedTo(NavigationEventArgs e)
     {
         base.OnNavigatedTo(e);
+        ViewModel.RewardStateChanged += OnRewardStateChanged;
+        ViewModel.DailyGoalReached += OnDailyGoalReached;
         _ = Profiles.LoadAsync();
         _ = Updates.LoadAsync();
 
@@ -48,6 +51,8 @@ public sealed partial class DashboardPage : Page
     protected override void OnNavigatedFrom(NavigationEventArgs e)
     {
         base.OnNavigatedFrom(e);
+        ViewModel.RewardStateChanged -= OnRewardStateChanged;
+        ViewModel.DailyGoalReached -= OnDailyGoalReached;
         if (_progressTimer is not null)
         {
             _progressTimer.Stop();
@@ -56,6 +61,22 @@ public sealed partial class DashboardPage : Page
     }
 
     private Microsoft.UI.Dispatching.DispatcherQueueTimer? _progressTimer;
+
+    /// <summary>A reward earned gets confetti; every other state change gets a bounce of the ring.</summary>
+    private void OnRewardStateChanged(object? sender, RewardState state) => DispatcherQueue.TryEnqueue(() =>
+    {
+        Motion.Pop(HeroRing);
+        if (state == RewardState.RewardReady)
+        {
+            Celebration.Burst();
+        }
+    });
+
+    private void OnDailyGoalReached(object? sender, EventArgs e) => DispatcherQueue.TryEnqueue(() =>
+    {
+        Motion.Pop(TodayCard, 1.02);
+        Celebration.Burst(0.5);
+    });
 
     private async void OnProgressTimerTick(Microsoft.UI.Dispatching.DispatcherQueueTimer sender, object args) => await ViewModel.LoadProgressAsync();
 

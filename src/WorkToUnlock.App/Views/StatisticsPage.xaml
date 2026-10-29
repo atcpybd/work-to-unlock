@@ -3,10 +3,17 @@
     x:Class="WorkToUnlock.App.Views.StatisticsPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:WorkToUnlock.App.Controls"
     xmlns:vm="using:WorkToUnlock.App.ViewModels">
 
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel MaxWidth="{StaticResource PageMaxWidth}" Padding="{StaticResource PagePadding}" Spacing="16">
+            <StackPanel.ChildrenTransitions>
+                <TransitionCollection>
+                    <EntranceThemeTransition IsStaggeringEnabled="True" FromVerticalOffset="36" />
+                    <RepositionThemeTransition />
+                </TransitionCollection>
+            </StackPanel.ChildrenTransitions>
             <Grid>
                 <StackPanel Spacing="4">
                     <TextBlock Style="{StaticResource PageTitleStyle}" Text="Statistics" AutomationProperties.HeadingLevel="Level1" />
@@ -28,7 +35,7 @@
                 </ItemsRepeater.Layout>
                 <ItemsRepeater.ItemTemplate>
                     <DataTemplate x:DataType="vm:MetricViewModel">
-                        <Border Style="{StaticResource CardStyle}">
+                        <Border Style="{StaticResource CardStyle}" controls:Motion.HoverLift="True">
                             <StackPanel Spacing="2">
                                 <TextBlock Style="{StaticResource SecondaryTextStyle}" Text="{x:Bind Title}" />
                                 <TextBlock Style="{StaticResource MetricValueStyle}" Text="{x:Bind Value, Mode=OneWay}" />
@@ -56,8 +63,8 @@
                                         <RowDefinition Height="*" />
                                         <RowDefinition Height="Auto" />
                                     </Grid.RowDefinitions>
-                                    <Rectangle Width="26" Height="{x:Bind BarHeight}" VerticalAlignment="Bottom" RadiusX="4" RadiusY="4" Fill="{ThemeResource AccentFillColorDefaultBrush}" Visibility="{x:Bind GoalMet}" />
-                                    <Rectangle Width="26" Height="{x:Bind BarHeight}" VerticalAlignment="Bottom" RadiusX="4" RadiusY="4" Fill="{ThemeResource ControlStrongFillColorDisabledBrush}" Visibility="{x:Bind GoalMissed}" />
+                                    <Rectangle Width="26" Height="{x:Bind BarHeight}" VerticalAlignment="Bottom" RadiusX="4" RadiusY="4" Fill="{ThemeResource AccentFillColorDefaultBrush}" Visibility="{x:Bind GoalMet}" controls:Motion.GrowIn="True" />
+                                    <Rectangle Width="26" Height="{x:Bind BarHeight}" VerticalAlignment="Bottom" RadiusX="4" RadiusY="4" Fill="{ThemeResource ControlStrongFillColorDisabledBrush}" Visibility="{x:Bind GoalMissed}" controls:Motion.GrowIn="True" />
                                     <TextBlock Grid.Row="1" Margin="0,6,0,0" HorizontalAlignment="Center" Style="{StaticResource SecondaryTextStyle}" Text="{x:Bind Label}" />
                                 </Grid>
                             </DataTemplate>
@@ -77,6 +84,7 @@
                         <ItemsRepeater.ItemTemplate>
                             <DataTemplate x:DataType="vm:AchievementViewModel">
                                 <Grid Padding="12" ColumnSpacing="12" CornerRadius="8" Background="{ThemeResource SubtleFillColorSecondaryBrush}" Opacity="{x:Bind Opacity}"
+                                      controls:Motion.Entrance="True" controls:Motion.HoverLift="True"
                                       ToolTipService.ToolTip="{x:Bind ToolTip}" AutomationProperties.Name="{x:Bind ToolTip}">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto" />

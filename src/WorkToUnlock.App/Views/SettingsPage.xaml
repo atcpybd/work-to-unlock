@@ -3,6 +3,7 @@
     x:Class="WorkToUnlock.App.Views.SettingsPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:WorkToUnlock.App.Controls"
     xmlns:vm="using:WorkToUnlock.App.ViewModels">
 
     <Page.Resources>
@@ -29,6 +30,12 @@
 
         <ScrollViewer VerticalScrollBarVisibility="Auto">
             <StackPanel MaxWidth="{StaticResource PageMaxWidth}" Padding="{StaticResource PagePadding}" Spacing="16">
+                <StackPanel.ChildrenTransitions>
+                    <TransitionCollection>
+                        <EntranceThemeTransition IsStaggeringEnabled="True" FromVerticalOffset="36" />
+                        <RepositionThemeTransition />
+                    </TransitionCollection>
+                </StackPanel.ChildrenTransitions>
                 <TextBlock Style="{StaticResource PageTitleStyle}" Text="Settings" AutomationProperties.HeadingLevel="Level1" />
 
                 <InfoBar IsOpen="{x:Bind ViewModel.HasValidationMessage, Mode=OneWay}" IsClosable="False" Severity="Error" Title="Settings were not saved" Message="{x:Bind ViewModel.ValidationMessage, Mode=OneWay}" />

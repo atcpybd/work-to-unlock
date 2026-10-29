@@ -18,6 +18,8 @@ public sealed partial class DashboardViewModel : ObservableObject
     private readonly PresetViewModel _customPreset;
     private IReadOnlyList<ApplicationRule> _rules = [];
     private AppSettings _settings = AppSettings.Default;
+    private RewardState? _lastState;
+    private bool? _lastGoalMet;
 
     public DashboardViewModel(AgentConnection agent, DialogService dialogs, IconCache icons)
     {
@@ -54,6 +56,12 @@ public sealed partial class DashboardViewModel : ObservableObject
             Apply(last);
         }
     }
+
+    /// <summary>The reward state changed while the dashboard was open (not raised for the first status).</summary>
+    public event EventHandler<RewardState>? RewardStateChanged;
+
+    /// <summary>Today's goal was reached while the dashboard was open.</summary>
+    public event EventHandler? DailyGoalReached;
 
     public ObservableCollection<RestrictedAppStatusViewModel> RestrictedApps { get; } = [];
 
@@ -193,6 +201,12 @@ public sealed partial class DashboardViewModel : ObservableObject
 
     private void ApplyProgress(DailyProgress progress)
     {
+        if (_lastGoalMet == false && progress.GoalMet)
+        {
+            DailyGoalReached?.Invoke(this, EventArgs.Empty);
+        }
+
+        _lastGoalMet = progress.GoalMet;
         HasGoal = progress.GoalEnabled;
         GoalPercent = progress.Fraction * 100;
         TodayText = progress.GoalEnabled
@@ -407,6 +421,12 @@ public sealed partial class DashboardViewModel : ObservableObject
 
     private void Apply(RewardStatus reward)
     {
+        if (_lastState is { } previous && previous != reward.State)
+        {
+            RewardStateChanged?.Invoke(this, reward.State);
+        }
+
+        _lastState = reward.State;
         Progress = reward.State == RewardState.Unlocked && reward.RewardDuration > TimeSpan.Zero
             ? reward.RemainingReward.TotalSeconds / reward.RewardDuration.TotalSeconds
             : reward.ProgressFraction;

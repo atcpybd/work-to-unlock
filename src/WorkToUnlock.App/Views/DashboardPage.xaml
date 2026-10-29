@@ -8,10 +8,10 @@
 
     <Page.Resources>
         <DataTemplate x:Key="MetricCardTemplate" x:DataType="vm:MetricViewModel">
-            <Border Style="{StaticResource CardStyle}">
+            <Border Style="{StaticResource CardStyle}" controls:Motion.HoverLift="True">
                 <StackPanel Spacing="4">
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Ellipse Width="9" Height="9" VerticalAlignment="Center" Fill="{ThemeResource SystemFillColorSuccessBrush}" Visibility="{x:Bind ShowIndicator, Mode=OneWay}" />
+                        <Ellipse Width="9" Height="9" VerticalAlignment="Center" Fill="{ThemeResource SystemFillColorSuccessBrush}" Visibility="{x:Bind ShowIndicator, Mode=OneWay}" controls:Motion.Pulse="{x:Bind ShowIndicator, Mode=OneWay}" />
                         <TextBlock Style="{StaticResource SecondaryTextStyle}" Text="{x:Bind Title, Mode=OneWay}" />
                     </StackPanel>
                     <TextBlock Style="{StaticResource MetricValueStyle}" Text="{x:Bind Value, Mode=OneWay}" TextTrimming="CharacterEllipsis" />
@@ -21,232 +21,245 @@
         </DataTemplate>
     </Page.Resources>
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <StackPanel MaxWidth="{StaticResource PageMaxWidth}" Padding="{StaticResource PagePadding}" Spacing="16">
-            <TextBlock Text="Dashboard" Style="{StaticResource PageTitleStyle}" AutomationProperties.HeadingLevel="Level1" />
+    <Grid>
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel MaxWidth="{StaticResource PageMaxWidth}" Padding="{StaticResource PagePadding}" Spacing="16">
+                <!-- Cards rise in one after another; reflow (an info bar opening) slides instead of jumping. -->
+                <StackPanel.ChildrenTransitions>
+                    <TransitionCollection>
+                        <EntranceThemeTransition IsStaggeringEnabled="True" FromVerticalOffset="36" />
+                        <RepositionThemeTransition />
+                    </TransitionCollection>
+                </StackPanel.ChildrenTransitions>
+                <TextBlock Text="Dashboard" Style="{StaticResource PageTitleStyle}" AutomationProperties.HeadingLevel="Level1" />
 
-            <InfoBar
-                IsOpen="{x:Bind Updates.IsUpdateAvailable, Mode=OneWay}"
-                IsClosable="True"
-                Severity="Informational"
-                Title="{x:Bind Updates.Title, Mode=OneWay}"
-                Message="{x:Bind Updates.ProgressText, Mode=OneWay}">
-                <InfoBar.ActionButton>
-                    <Button Content="Update now" Command="{x:Bind Updates.InstallCommand}" />
-                </InfoBar.ActionButton>
-            </InfoBar>
+                <InfoBar
+                    IsOpen="{x:Bind Updates.IsUpdateAvailable, Mode=OneWay}"
+                    IsClosable="True"
+                    Severity="Informational"
+                    Title="{x:Bind Updates.Title, Mode=OneWay}"
+                    Message="{x:Bind Updates.ProgressText, Mode=OneWay}">
+                    <InfoBar.ActionButton>
+                        <Button Content="Update now" Command="{x:Bind Updates.InstallCommand}" />
+                    </InfoBar.ActionButton>
+                </InfoBar>
 
-            <InfoBar
-                IsOpen="{x:Bind ViewModel.PersistenceWarning, Mode=OneWay}"
-                IsClosable="False"
-                Severity="Warning"
-                Title="Progress is not being saved"
-                Message="Work to Unlock cannot write to its database right now and keeps retrying. Recent progress may be lost if the PC restarts." />
+                <InfoBar
+                    IsOpen="{x:Bind ViewModel.PersistenceWarning, Mode=OneWay}"
+                    IsClosable="False"
+                    Severity="Warning"
+                    Title="Progress is not being saved"
+                    Message="Work to Unlock cannot write to its database right now and keeps retrying. Recent progress may be lost if the PC restarts." />
 
-            <!-- Progress hero -->
-            <Border Style="{StaticResource CardStyle}" Padding="32">
-                <Grid ColumnSpacing="40">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
+                <!-- Progress hero -->
+                <Border Style="{StaticResource CardStyle}" Padding="32">
+                    <Grid ColumnSpacing="40">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
 
-                    <Grid Width="224" Height="224">
-                        <controls:CircularProgress Value="{x:Bind ViewModel.Progress, Mode=OneWay}" Thickness="16" />
-                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="2">
+                        <Grid x:Name="HeroRing" Width="224" Height="224">
+                            <controls:CircularProgress Value="{x:Bind ViewModel.Progress, Mode=OneWay}" Thickness="16" />
+                            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="2">
+                                <TextBlock
+                                    HorizontalAlignment="Center"
+                                    Style="{StaticResource TitleLargeTextBlockStyle}"
+                                    Text="{x:Bind ViewModel.WorkedText, Mode=OneWay}" />
+                                <TextBlock
+                                    HorizontalAlignment="Center"
+                                    Style="{StaticResource SecondaryTextStyle}"
+                                    Text="{x:Bind ViewModel.RequiredText, Mode=OneWay}" />
+                            </StackPanel>
+                        </Grid>
+
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="10">
+                            <TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="{x:Bind ViewModel.Headline, Mode=OneWay}" AutomationProperties.HeadingLevel="Level2" controls:Motion.AnimateTextChanges="True" />
                             <TextBlock
-                                HorizontalAlignment="Center"
-                                Style="{StaticResource TitleLargeTextBlockStyle}"
-                                Text="{x:Bind ViewModel.WorkedText, Mode=OneWay}" />
-                            <TextBlock
-                                HorizontalAlignment="Center"
-                                Style="{StaticResource SecondaryTextStyle}"
-                                Text="{x:Bind ViewModel.RequiredText, Mode=OneWay}" />
+                                MaxWidth="540"
+                                HorizontalAlignment="Left"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Text="{x:Bind ViewModel.Subtitle, Mode=OneWay}"
+                                TextWrapping="Wrap" />
+                            <Button
+                                Margin="0,10,0,0"
+                                Padding="24,12"
+                                AutomationProperties.Name="{x:Bind ViewModel.UnlockButtonText, Mode=OneWay}"
+                                Command="{x:Bind ViewModel.ActivateCommand}"
+                                Style="{StaticResource AccentButtonStyle}"
+                                Visibility="{x:Bind ViewModel.CanActivate, Mode=OneWay}"
+                                controls:Motion.Breathe="{x:Bind ViewModel.CanActivate, Mode=OneWay}">
+                                <StackPanel Orientation="Horizontal" Spacing="10">
+                                    <FontIcon FontSize="18" Glyph="&#xE785;" />
+                                    <TextBlock FontSize="16" FontWeight="SemiBold" Text="{x:Bind ViewModel.UnlockButtonText, Mode=OneWay}" />
+                                </StackPanel>
+                            </Button>
+                            <StackPanel Orientation="Horizontal" Spacing="8" Visibility="{x:Bind ViewModel.IsUnlocked, Mode=OneWay}">
+                                <FontIcon Glyph="&#xE916;" FontSize="16" Foreground="{ThemeResource SystemFillColorSuccessBrush}" />
+                                <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{x:Bind ViewModel.ExpiresText, Mode=OneWay}" />
+                            </StackPanel>
+                            <Button
+                                Margin="0,6,0,0"
+                                AutomationProperties.Name="End break and save the time left"
+                                Command="{x:Bind ViewModel.EndBreakCommand}"
+                                Visibility="{x:Bind ViewModel.CanEndEarly, Mode=OneWay}">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <FontIcon FontSize="14" Glyph="&#xE71A;" />
+                                    <TextBlock Text="End break and save the time left" />
+                                </StackPanel>
+                            </Button>
+                            <Button
+                                Margin="0,6,0,0"
+                                AutomationProperties.Name="Reset timer"
+                                Command="{x:Bind ViewModel.ResetCommand}"
+                                ToolTipService.ToolTip="Set the work timer back to 00:00">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <FontIcon FontSize="14" Glyph="&#xE777;" />
+                                    <TextBlock Text="Reset timer" />
+                                </StackPanel>
+                            </Button>
                         </StackPanel>
                     </Grid>
+                </Border>
 
-                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="10">
-                        <TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="{x:Bind ViewModel.Headline, Mode=OneWay}" AutomationProperties.HeadingLevel="Level2" />
-                        <TextBlock
-                            MaxWidth="540"
-                            HorizontalAlignment="Left"
-                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                            Text="{x:Bind ViewModel.Subtitle, Mode=OneWay}"
-                            TextWrapping="Wrap" />
-                        <Button
-                            Margin="0,10,0,0"
-                            Padding="24,12"
-                            AutomationProperties.Name="{x:Bind ViewModel.UnlockButtonText, Mode=OneWay}"
-                            Command="{x:Bind ViewModel.ActivateCommand}"
-                            Style="{StaticResource AccentButtonStyle}"
-                            Visibility="{x:Bind ViewModel.CanActivate, Mode=OneWay}">
+                <!-- Today: daily goal, streak, blocked attempts -->
+                <Border x:Name="TodayCard" Style="{StaticResource CardStyle}">
+                    <Grid ColumnSpacing="32">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Spacing="6">
+                            <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="Today" AutomationProperties.HeadingLevel="Level2" />
+                            <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="{x:Bind ViewModel.TodayText, Mode=OneWay}" />
+                            <ProgressBar Maximum="100" Value="{x:Bind ViewModel.GoalPercent, Mode=OneWay}" Visibility="{x:Bind ViewModel.HasGoal, Mode=OneWay}" AutomationProperties.Name="Daily goal progress" />
+                            <TextBlock Style="{StaticResource SecondaryTextStyle}" Text="{x:Bind ViewModel.GoalStatusText, Mode=OneWay}" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="10">
                             <StackPanel Orientation="Horizontal" Spacing="10">
-                                <FontIcon FontSize="18" Glyph="&#xE785;" />
-                                <TextBlock FontSize="16" FontWeight="SemiBold" Text="{x:Bind ViewModel.UnlockButtonText, Mode=OneWay}" />
+                                <FontIcon FontSize="18" Foreground="{ThemeResource SystemFillColorCautionBrush}" Glyph="&#xE735;" />
+                                <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{x:Bind ViewModel.StreakText, Mode=OneWay}" />
                             </StackPanel>
-                        </Button>
-                        <StackPanel Orientation="Horizontal" Spacing="8" Visibility="{x:Bind ViewModel.IsUnlocked, Mode=OneWay}">
-                            <FontIcon Glyph="&#xE916;" FontSize="16" Foreground="{ThemeResource SystemFillColorSuccessBrush}" />
-                            <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{x:Bind ViewModel.ExpiresText, Mode=OneWay}" />
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <FontIcon FontSize="18" Glyph="&#xE72E;" />
+                                <TextBlock Text="{x:Bind ViewModel.BlockedTodayText, Mode=OneWay}" />
+                            </StackPanel>
                         </StackPanel>
-                        <Button
-                            Margin="0,6,0,0"
-                            AutomationProperties.Name="End break and save the time left"
-                            Command="{x:Bind ViewModel.EndBreakCommand}"
-                            Visibility="{x:Bind ViewModel.CanEndEarly, Mode=OneWay}">
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <FontIcon FontSize="14" Glyph="&#xE71A;" />
-                                <TextBlock Text="End break and save the time left" />
-                            </StackPanel>
-                        </Button>
-                        <Button
-                            Margin="0,6,0,0"
-                            AutomationProperties.Name="Reset timer"
-                            Command="{x:Bind ViewModel.ResetCommand}"
-                            ToolTipService.ToolTip="Set the work timer back to 00:00">
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <FontIcon FontSize="14" Glyph="&#xE777;" />
-                                <TextBlock Text="Reset timer" />
-                            </StackPanel>
-                        </Button>
-                    </StackPanel>
-                </Grid>
-            </Border>
+                    </Grid>
+                </Border>
 
-            <!-- Today: daily goal, streak, blocked attempts -->
-            <Border Style="{StaticResource CardStyle}">
-                <Grid ColumnSpacing="32">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <StackPanel Spacing="6">
-                        <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="Today" AutomationProperties.HeadingLevel="Level2" />
-                        <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="{x:Bind ViewModel.TodayText, Mode=OneWay}" />
-                        <ProgressBar Maximum="100" Value="{x:Bind ViewModel.GoalPercent, Mode=OneWay}" Visibility="{x:Bind ViewModel.HasGoal, Mode=OneWay}" AutomationProperties.Name="Daily goal progress" />
-                        <TextBlock Style="{StaticResource SecondaryTextStyle}" Text="{x:Bind ViewModel.GoalStatusText, Mode=OneWay}" />
-                    </StackPanel>
-                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="10">
-                        <StackPanel Orientation="Horizontal" Spacing="10">
-                            <FontIcon FontSize="18" Foreground="{ThemeResource SystemFillColorCautionBrush}" Glyph="&#xE735;" />
-                            <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{x:Bind ViewModel.StreakText, Mode=OneWay}" />
+                <!-- Work / break presets -->
+                <Border Style="{StaticResource CardStyle}">
+                    <StackPanel Spacing="12">
+                        <StackPanel Spacing="2">
+                            <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="Work and break" AutomationProperties.HeadingLevel="Level2" />
+                            <TextBlock Style="{StaticResource SecondaryTextStyle}" Text="{x:Bind ViewModel.PresetSummary, Mode=OneWay}" />
                         </StackPanel>
-                        <StackPanel Orientation="Horizontal" Spacing="10">
-                            <FontIcon FontSize="18" Glyph="&#xE72E;" />
-                            <TextBlock Text="{x:Bind ViewModel.BlockedTodayText, Mode=OneWay}" />
+                        <StackPanel Spacing="8" Visibility="{x:Bind Profiles.HasProfiles, Mode=OneWay}">
+                            <TextBlock Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="Profiles" />
+                            <ItemsRepeater ItemsSource="{x:Bind Profiles.Items}">
+                                <ItemsRepeater.Layout>
+                                    <UniformGridLayout MinItemWidth="200" MinItemHeight="60" MinColumnSpacing="8" MinRowSpacing="8" ItemsStretch="Fill" />
+                                </ItemsRepeater.Layout>
+                                <ItemsRepeater.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:ProfileItemViewModel">
+                                        <ToggleButton
+                                            HorizontalAlignment="Stretch"
+                                            VerticalAlignment="Stretch"
+                                            HorizontalContentAlignment="Left"
+                                            Padding="12,6"
+                                            AutomationProperties.Name="{x:Bind AccessibleName}"
+                                            ToolTipService.ToolTip="{x:Bind Summary}"
+                                            Command="{x:Bind UseCommand}"
+                                            IsChecked="{x:Bind IsActive, Mode=OneWay}">
+                                            <StackPanel Spacing="1">
+                                                <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{x:Bind Name}" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Style="{StaticResource CaptionTextBlockStyle}" Text="{x:Bind Summary}" TextTrimming="CharacterEllipsis" />
+                                            </StackPanel>
+                                        </ToggleButton>
+                                    </DataTemplate>
+                                </ItemsRepeater.ItemTemplate>
+                            </ItemsRepeater>
+                            <TextBlock Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="Times" Margin="0,4,0,0" />
                         </StackPanel>
-                    </StackPanel>
-                </Grid>
-            </Border>
-
-            <!-- Work / break presets -->
-            <Border Style="{StaticResource CardStyle}">
-                <StackPanel Spacing="12">
-                    <StackPanel Spacing="2">
-                        <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="Work and break" AutomationProperties.HeadingLevel="Level2" />
-                        <TextBlock Style="{StaticResource SecondaryTextStyle}" Text="{x:Bind ViewModel.PresetSummary, Mode=OneWay}" />
-                    </StackPanel>
-                    <StackPanel Spacing="8" Visibility="{x:Bind Profiles.HasProfiles, Mode=OneWay}">
-                        <TextBlock Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="Profiles" />
-                        <ItemsRepeater ItemsSource="{x:Bind Profiles.Items}">
+                        <ItemsRepeater ItemsSource="{x:Bind ViewModel.Presets}">
                             <ItemsRepeater.Layout>
-                                <UniformGridLayout MinItemWidth="200" MinItemHeight="60" MinColumnSpacing="8" MinRowSpacing="8" ItemsStretch="Fill" />
+                                <UniformGridLayout MinItemWidth="132" MinItemHeight="60" MinColumnSpacing="8" MinRowSpacing="8" ItemsStretch="Fill" />
                             </ItemsRepeater.Layout>
                             <ItemsRepeater.ItemTemplate>
-                                <DataTemplate x:DataType="vm:ProfileItemViewModel">
+                                <DataTemplate x:DataType="vm:PresetViewModel">
                                     <ToggleButton
                                         HorizontalAlignment="Stretch"
                                         VerticalAlignment="Stretch"
-                                        HorizontalContentAlignment="Left"
-                                        Padding="12,6"
-                                        AutomationProperties.Name="{x:Bind AccessibleName}"
-                                        ToolTipService.ToolTip="{x:Bind Summary}"
-                                        Command="{x:Bind UseCommand}"
-                                        IsChecked="{x:Bind IsActive, Mode=OneWay}">
+                                        HorizontalContentAlignment="Center"
+                                        AutomationProperties.Name="{x:Bind AccessibleName, Mode=OneWay}"
+                                        Command="{x:Bind SelectCommand}"
+                                        IsChecked="{x:Bind IsSelected, Mode=OneWay}">
                                         <StackPanel Spacing="1">
-                                            <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{x:Bind Name}" TextTrimming="CharacterEllipsis" />
-                                            <TextBlock Style="{StaticResource CaptionTextBlockStyle}" Text="{x:Bind Summary}" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock HorizontalAlignment="Center" Style="{StaticResource BodyStrongTextBlockStyle}" Text="{x:Bind Title, Mode=OneWay}" />
+                                            <TextBlock HorizontalAlignment="Center" Style="{StaticResource CaptionTextBlockStyle}" Text="{x:Bind Subtitle, Mode=OneWay}" />
                                         </StackPanel>
                                     </ToggleButton>
                                 </DataTemplate>
                             </ItemsRepeater.ItemTemplate>
                         </ItemsRepeater>
-                        <TextBlock Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="Times" Margin="0,4,0,0" />
                     </StackPanel>
-                    <ItemsRepeater ItemsSource="{x:Bind ViewModel.Presets}">
-                        <ItemsRepeater.Layout>
-                            <UniformGridLayout MinItemWidth="132" MinItemHeight="60" MinColumnSpacing="8" MinRowSpacing="8" ItemsStretch="Fill" />
-                        </ItemsRepeater.Layout>
-                        <ItemsRepeater.ItemTemplate>
-                            <DataTemplate x:DataType="vm:PresetViewModel">
-                                <ToggleButton
-                                    HorizontalAlignment="Stretch"
-                                    VerticalAlignment="Stretch"
-                                    HorizontalContentAlignment="Center"
-                                    AutomationProperties.Name="{x:Bind AccessibleName, Mode=OneWay}"
-                                    Command="{x:Bind SelectCommand}"
-                                    IsChecked="{x:Bind IsSelected, Mode=OneWay}">
-                                    <StackPanel Spacing="1">
-                                        <TextBlock HorizontalAlignment="Center" Style="{StaticResource BodyStrongTextBlockStyle}" Text="{x:Bind Title, Mode=OneWay}" />
-                                        <TextBlock HorizontalAlignment="Center" Style="{StaticResource CaptionTextBlockStyle}" Text="{x:Bind Subtitle, Mode=OneWay}" />
-                                    </StackPanel>
-                                </ToggleButton>
-                            </DataTemplate>
-                        </ItemsRepeater.ItemTemplate>
-                    </ItemsRepeater>
-                </StackPanel>
-            </Border>
+                </Border>
 
-            <!-- Metrics: equal-width cards that reflow from four columns to two or one. -->
-            <ItemsRepeater ItemsSource="{x:Bind ViewModel.Metrics}" ItemTemplate="{StaticResource MetricCardTemplate}">
-                <ItemsRepeater.Layout>
-                    <UniformGridLayout MinItemWidth="200" MinItemHeight="152" MinColumnSpacing="12" MinRowSpacing="12" ItemsStretch="Fill" ItemsJustification="Start" />
-                </ItemsRepeater.Layout>
-            </ItemsRepeater>
+                <!-- Metrics: equal-width cards that reflow from four columns to two or one. -->
+                <ItemsRepeater ItemsSource="{x:Bind ViewModel.Metrics}" ItemTemplate="{StaticResource MetricCardTemplate}">
+                    <ItemsRepeater.Layout>
+                        <UniformGridLayout MinItemWidth="200" MinItemHeight="152" MinColumnSpacing="12" MinRowSpacing="12" ItemsStretch="Fill" ItemsJustification="Start" />
+                    </ItemsRepeater.Layout>
+                </ItemsRepeater>
 
-            <InfoBar
-                IsOpen="{x:Bind ViewModel.HasEnforcementProblems, Mode=OneWay}"
-                IsClosable="False"
-                Severity="{x:Bind ViewModel.EnforcementSeverity, Mode=OneWay}"
-                Title="Enforcement needs attention"
-                Message="{x:Bind ViewModel.EnforcementProblems, Mode=OneWay}" />
+                <InfoBar
+                    IsOpen="{x:Bind ViewModel.HasEnforcementProblems, Mode=OneWay}"
+                    IsClosable="False"
+                    Severity="{x:Bind ViewModel.EnforcementSeverity, Mode=OneWay}"
+                    Title="Enforcement needs attention"
+                    Message="{x:Bind ViewModel.EnforcementProblems, Mode=OneWay}" />
 
-            <!-- Restricted apps -->
-            <Border Style="{StaticResource CardStyle}">
-                <StackPanel Spacing="4">
-                    <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="Restricted applications" AutomationProperties.HeadingLevel="Level2" />
-                    <TextBlock
-                        Style="{StaticResource SecondaryTextStyle}"
-                        Text="No restricted applications yet. Add Steam, Discord or anything else that distracts you on the Applications page."
-                        Visibility="{x:Bind ViewModel.HasNoRestrictedApps, Mode=OneWay}" />
-                    <ItemsControl ItemsSource="{x:Bind ViewModel.RestrictedApps}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="vm:RestrictedAppStatusViewModel">
-                                <Grid Padding="0,8" ColumnSpacing="12">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <Image Width="28" Height="28" Source="{x:Bind Icon, Mode=OneWay}" />
-                                    <TextBlock Grid.Column="1" VerticalAlignment="Center" Text="{x:Bind Name}" />
-                                    <Border Grid.Column="2" Style="{StaticResource ChipStyle}">
-                                        <StackPanel Orientation="Horizontal" Spacing="6">
-                                            <FontIcon FontSize="12" Glyph="&#xE72E;" Visibility="{x:Bind IsLocked, Mode=OneWay}" />
-                                            <FontIcon FontSize="12" Glyph="&#xE785;" Visibility="{x:Bind IsAvailable, Mode=OneWay}" />
-                                            <TextBlock Style="{StaticResource CaptionTextBlockStyle}" Text="{x:Bind StatusText, Mode=OneWay}" />
-                                        </StackPanel>
-                                    </Border>
-                                </Grid>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </StackPanel>
-            </Border>
+                <!-- Restricted apps -->
+                <Border Style="{StaticResource CardStyle}">
+                    <StackPanel Spacing="4">
+                        <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="Restricted applications" AutomationProperties.HeadingLevel="Level2" />
+                        <TextBlock
+                            Style="{StaticResource SecondaryTextStyle}"
+                            Text="No restricted applications yet. Add Steam, Discord or anything else that distracts you on the Applications page."
+                            Visibility="{x:Bind ViewModel.HasNoRestrictedApps, Mode=OneWay}" />
+                        <ItemsControl ItemsSource="{x:Bind ViewModel.RestrictedApps}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:RestrictedAppStatusViewModel">
+                                    <Grid Padding="0,8" ColumnSpacing="12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Image Width="28" Height="28" Source="{x:Bind Icon, Mode=OneWay}" />
+                                        <TextBlock Grid.Column="1" VerticalAlignment="Center" Text="{x:Bind Name}" />
+                                        <Border Grid.Column="2" Style="{StaticResource ChipStyle}">
+                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                <FontIcon FontSize="12" Glyph="&#xE72E;" Visibility="{x:Bind IsLocked, Mode=OneWay}" />
+                                                <FontIcon FontSize="12" Glyph="&#xE785;" Visibility="{x:Bind IsAvailable, Mode=OneWay}" />
+                                                <TextBlock Style="{StaticResource CaptionTextBlockStyle}" Text="{x:Bind StatusText, Mode=OneWay}" />
+                                            </StackPanel>
+                                        </Border>
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
 
-            <TextBlock
-                Style="{StaticResource SecondaryTextStyle}"
-                Text="Work to Unlock measures which approved app is in the foreground while you are active. It cannot tell whether work is meaningful, and it never reads window titles, documents or keystrokes. Everything stays on this PC." />
-        </StackPanel>
-    </ScrollViewer>
+                <TextBlock
+                    Style="{StaticResource SecondaryTextStyle}"
+                    Text="Work to Unlock measures which approved app is in the foreground while you are active. It cannot tell whether work is meaningful, and it never reads window titles, documents or keystrokes. Everything stays on this PC." />
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Celebrations play over the page and never take clicks. -->
+        <controls:Confetti x:Name="Celebration" />
+    </Grid>
 </Page>

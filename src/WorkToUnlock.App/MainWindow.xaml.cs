@@ -103,15 +103,25 @@ public sealed partial class MainWindow : Window
 
         if (ContentFrame.CurrentSourcePageType != type)
         {
-            ContentFrame.Navigate(type, null, new EntranceNavigationTransitionInfo());
+            ContentFrame.Navigate(type, null, TransitionTo(type));
         }
+    }
+
+    /// <summary>Slides in from the side the page sits on in the menu, so moving down the list moves forward.</summary>
+    private NavigationTransitionInfo TransitionTo(Type type)
+    {
+        var order = Pages.Values.ToList();
+        var from = ContentFrame.CurrentSourcePageType is { } current ? order.IndexOf(current) : -1;
+        return from < 0
+            ? new EntranceNavigationTransitionInfo()
+            : new SlideNavigationTransitionInfo { Effect = order.IndexOf(type) > from ? SlideNavigationTransitionEffect.FromRight : SlideNavigationTransitionEffect.FromLeft };
     }
 
     private void OnNavigationSelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
     {
         if (args.SelectedItem is NavigationViewItem { Tag: string tag } && Pages.TryGetValue(tag, out var type) && ContentFrame.CurrentSourcePageType != type)
         {
-            ContentFrame.Navigate(type, null, new EntranceNavigationTransitionInfo());
+            ContentFrame.Navigate(type, null, TransitionTo(type));
         }
     }
 
